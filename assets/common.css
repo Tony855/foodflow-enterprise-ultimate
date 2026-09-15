@@ -1,0 +1,403 @@
+/* ============================================================
+   FoodFlow Ordering System - Design System (Design System)
+   所有页面共享此文件，确保视觉风格一致
+   ============================================================ */
+
+/* ---------- CSS 变量：统一设计令牌 ---------- */
+:root {
+  /* 品牌主色 */
+  --primary: #e85d3a;
+  --primary-light: #ff7a5c;
+  --primary-dark: #c94a2a;
+  --primary-bg: #fff5f0;
+  --primary-border: #f5d5c8;
+
+  /* 辅助色 */
+  --accent: #ffd93d;
+  --accent-dark: #f0c419;
+
+  /* 中性色 - 浅色主题 */
+  --gray-50: #fafbfc;
+  --gray-100: #f5f6f8;
+  --gray-200: #eef0f3;
+  --gray-300: #e0e3e8;
+  --gray-400: #c4c9d1;
+  --gray-500: #9aa0ab;
+  --gray-600: #6b7280;
+  --gray-700: #4b5563;
+  --gray-800: #2d3138;
+  --gray-900: #1a1d23;
+
+  /* 语义色 */
+  --success: #2ecc71;
+  --success-bg: #e3f5e3;
+  --success-text: #1d7a3e;
+  --warning: #f39c12;
+  --warning-bg: #fff5e0;
+  --warning-text: #b8742a;
+  --danger: #e74c3c;
+  --danger-bg: #fdecea;
+  --danger-text: #c0392b;
+  --info: #3498db;
+  --info-bg: #e8f4fd;
+  --info-text: #2471a3;
+
+  /* 桌台状态 */
+  --table-available: #2ecc71;
+  --table-occupied: #f39c12;
+  --table-reserved: #3498db;
+
+  /* 圆角 */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* 阴影 */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.16);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.22);
+  --shadow-primary: 0 4px 16px rgba(232, 93, 58, 0.25);
+
+  /* 过渡 */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 字体 */
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Consolas", monospace;
+
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* 层级 */
+  --z-dropdown: 100;
+  --z-sticky: 100;
+  --z-modal: 200;
+  --z-toast: 999;
+}
+
+/* ---------- 全局重置 ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  /* 始终预留滚动条空间，避免某个页面/模块内容较多出现滚动条、
+     另一个内容较少不出现滚动条时，内容框到侧边栏的可用宽度
+     发生变化，看起来像"边距间隔不一致" */
+  scrollbar-gutter: stable;
+}
+
+/* ---------- 全局滚动条美化 ----------
+   之前没有自定义滚动条样式，不同系统/浏览器会各自套用原生滚动条
+   （宽度不同、是否带上下箭头也不同），这也是内容框边距时宽时窄的
+   常见原因。这里统一改成纤细、半透明的滚动条。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 120, 145, 0.4) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 145, 0.4);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 145, 0.6);
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--gray-800);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ---------- 通用按钮 ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border-color: var(--gray-300);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--gray-200);
+}
+
+/* ---------- 通用输入框 ---------- */
+.input,
+.select,
+.textarea {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--gray-300);
+  background: #fff;
+  color: var(--gray-800);
+  font-size: 14px;
+  transition: var(--transition-fast);
+  outline: none;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(232, 93, 58, 0.12);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--gray-400);
+}
+
+.textarea {
+  height: auto;
+  min-height: 80px;
+  padding: 10px 14px;
+  resize: vertical;
+}
+
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+
+/* ---------- 通用卡片 ---------- */
+.card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  padding: var(--space-5);
+}
+
+/* ---------- 通用 Toast ---------- */
+.toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  padding: 10px 22px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: var(--z-toast);
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition);
+  max-width: 90%;
+  text-align: center;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast.success {
+  background: rgba(46, 204, 113, 0.92);
+}
+
+.toast.error {
+  background: rgba(231, 76, 60, 0.92);
+}
+
+.toast.warning {
+  background: rgba(243, 156, 18, 0.92);
+}
+
+/* ---------- 状态标签（订单/桌台） ---------- */
+.status-pending {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.status-done {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.status-canceled {
+  background: var(--gray-200);
+  color: var(--gray-500);
+}
+
+/* ---------- 通用表单 ---------- */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-bottom: 6px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ---------- 空状态 ---------- */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray-400);
+}
+
+.empty-state .icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.empty-state .text {
+  font-size: 15px;
+}
+
+/* ---------- 页头 Header（跨页面统一规则） ----------
+   移动端：logo、店铺信息、桌号信息、操作按钮按原有页面样式排列
+   桌面端（>=769px）：logo 绝对定位水平居中；
+   店铺信息 + 桌号信息（.header-left）与右侧按钮（.header-right）
+   整体靠右对齐，紧挨在一起
+   用 !important 是为了确保覆盖各页面内联 <style> 中残留的旧布局规则，
+   common.css 在 <head> 中排在最后加载，配合 !important 可稳定生效 */
+@media (min-width: 769px) {
+  .header {
+    position: relative !important;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .header .header-logo {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+  }
+
+  .header .header-left {
+    margin-left: auto !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .header .header-right {
+    margin-left: 10px !important;
+    flex-wrap: nowrap !important;
+  }
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+
+}
+
+/* ---------- 打印样式 ---------- */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

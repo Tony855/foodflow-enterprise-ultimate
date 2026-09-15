@@ -1,0 +1,14 @@
+[
+  { "id": 1, "name": "A01", "status": "available" },
+  { "id": 2, "name": "A02", "status": "available" },
+  { "id": 3, "name": "A03", "status": "available" },
+  { "id": 4, "name": "B01", "status": "available" },
+  { "id": 5, "name": "B02", "status": "available" },
+  { "id": 6, "name": "B03", "status": "available" },
+  { "id": 7, "name": "C01", "status": "available" },
+  { "id": 8, "name": "C02", "status": "available" },
+  { "id": 9, "name": "C03", "status": "available" },
+  { "id": 10, "name": "D01", "status": "available" },
+  { "id": 11, "name": "D02", "status": "available" },
+  { "id": 12, "name": "D03", "status": "available" }
+]

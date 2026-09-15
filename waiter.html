@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.5">
+  <title>服务员点餐</title>
+  <script>
+    // 在样式和正文渲染之前同步判断登录态，避免刷新页面时登录窗口先闪现一下再消失
+    if (localStorage.getItem('waiterToken')) {
+      document.documentElement.setAttribute('data-waiter-session', '1');
+    }
+  </script>
+  <style>
+    /* ===== CSS 变量 ===== */
+    :root{
+      --primary: #e84a2a;
+      --primary-light: #ff6b4a;
+      --primary-dark: #c73d1f;
+      --primary-bg: #fef6f3;
+      --gray-1: #f8f9fb;
+      --gray-2: #eef0f2;
+      --gray-3: #d5d8dd;
+      --gray-4: #9ea3ac;
+      --gray-5: #6b7078;
+      --gray-6: #2d3138;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 8px 30px rgba(0,0,0,0.08);
+      --shadow-hover: 0 12px 40px rgba(0,0,0,0.15);
+      --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--gray-6);
+      min-height: 100vh;
+      padding-bottom: 80px;
+      /* ===== 登录背景（渐变 + 装饰光晕） ===== */
+      background: linear-gradient(145deg, #fff5f0 0%, #fde8dd 100%);
+      position: relative;
+    }
+    /* 背景装饰光晕（仅登录时可见，主界面会被内容覆盖） */
+    body::before{
+      content: '';
+      position: fixed;
+      top: -20%;
+      right: -10%;
+      width: 60%;
+      height: 80%;
+      background: radial-gradient(circle, rgba(232,74,42,0.10) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after{
+      content: '';
+      position: fixed;
+      bottom: -20%;
+      left: -10%;
+      width: 50%;
+      height: 70%;
+      background: radial-gradient(circle, rgba(255,140,76,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== Toast ===== */
+    .toast{
+      position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+      color: #fff; padding: 8px 24px; border-radius: 30px;
+      font-weight: 500; font-size: 14px; z-index: 999;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    }
+    .toast.show{ opacity: 1; }
+
+    /* ===== 头部（与前端统一风格）logo居中，信息+按钮全部靠右 ===== */
+    header{
+      position: sticky; top: 0; z-index: 100;
+      background: linear-gradient(135deg, #ff8a4c 0%, #e84a2a 100%);
+      color: #fff;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0;
+      box-shadow: 0 10px 28px rgba(200, 65, 30, .22);
+      border-radius: 0 0 22px 22px;
+      position: relative;
+    }
+    header .header-title{
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 20px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+      white-space: nowrap;
+    }
+    header .header-left{
+      display: flex; align-items: center; gap: 10px;
+      min-width: 0;
+      margin-left: auto;
+    }
+    header .header-right{
+      display: flex; align-items: center; gap: 10px;
+      flex-wrap: wrap;
+      margin-left: 10px;
+    }
+    header .waiter-name{
+      background: rgba(255,255,255,0.2);
+      padding: 4px 14px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    header .store-name{
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 4px 14px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    header .header-btn{
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #fff;
+      padding: 5px 14px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    header .header-btn:hover{
+      background: rgba(255,255,255,0.3);
+    }
+    header .icon-btn{
+      width: 34px;
+      height: 34px;
+      min-width: 34px;
+      padding: 0;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      line-height: 1;
+      position: relative;
+    }
+    header .call-notification-btn #callNotificationCount{
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #ff3b30;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 16px;
+      height: 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    header .call-notification-btn{
+      position: relative;
+      background: #ff7a45;
+      color: #fff;
+      border: 0;
+      padding: 5px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    /* 语言按钮圆形 */
+    .lang-btn-wrap{
+      width: 34px; height: 34px;
+      min-width: 34px; max-width: 34px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      padding: 0; margin: 0;
+      box-sizing: border-box;
+      overflow: hidden;
+      position: relative;
+    }
+    .lang-btn-wrap .lang-icon{
+      font-size: 16px;
+      line-height: 1;
+      pointer-events: none;
+    }
+    .lang-btn-wrap select{
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: transparent;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      height: 100%;
+    }
+    header select option{ color: var(--gray-6); background: #fff; }
+
+    /* ===== 主内容 ===== */
+    main{
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 0 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== 桌号网格 ===== */
+    .table-grid{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+    .table-card{
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(0,0,0,0.04);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .table-card:hover{
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover);
+    }
+    .table-card .name{
+      font-size: 22px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .table-card .name .status{
+      margin-top: 0;
+      font-size: 12px;
+      padding: 2px 10px;
+      font-weight: 500;
+    }
+    .table-card .status{
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 14px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status.available{ background: #e3f5e3; color: #1d7a3e; }
+    .status.occupied{ background: #fff0e0; color: #b85c2a; }
+    .status.reserved{ background: #e3edfc; color: #2a5fb8; }
+
+    .table-card .bill{
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--gray-2);
+      font-size: 14px;
+    }
+    .table-card .amount{
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 16px;
+    }
+    .bill-items{
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      max-height: 120px;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .bill-items::-webkit-scrollbar{ display: none; }
+    .bill-items .line{
+      display: grid;
+      grid-template-columns: 1fr 64px 72px;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+      border-bottom: 1px dashed var(--gray-2);
+    }
+    .bill-items .dish-name{ min-width:0; color: var(--gray-6); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .line-amount{ text-align:right; color: var(--gray-5); }
+    .bill-items .line .item-status,
+    .bill-items .line .item-toggle{ justify-self:center; text-align:center; white-space:nowrap; }
+    .item-status{
+      padding: 2px 10px;
+      border-radius: 30px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(250, 140, 22, .15);
+      color: #fa8c16;
+    }
+    .item-status.done{ background: rgba(82, 196, 26, .15); color: #52c41a; }
+    .item-toggle{
+      border: 0;
+      padding: 3px 12px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(250, 140, 22, .15);
+      color: #fa8c16;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .item-toggle.done{ background: rgba(82, 196, 26, .15); color: #52c41a; }
+    .order-block{
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--gray-2);
+    }
+    .order-head{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .order-head .order-meta{
+      font-weight: 400;
+      font-size: 12px;
+      color: #c8c8d0;
+    }
+    .session-badge{
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: rgba(123, 104, 238, .15);
+      color: #7b68ee;
+      font-size: 11px;
+      font-weight: 700;
+      margin-left: 4px;
+    }
+    .order-head button{
+      background: #e3f5e3;
+      border: 1px solid #b7dbb7;
+      color: #1d7a3e;
+      border-radius: 30px;
+      padding: 2px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .order-head button:hover{ background: #c8eac8; }
+
+    /* ===== 通用模态框 ===== */
+    .modal{
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 16px;
+    }
+    .modal.open{ display: flex; }
+    /* 页面刷新时，若已存在服务员登录态，则在首次绘制前就隐藏登录窗口，避免闪一下登录窗口又消失 */
+    html[data-waiter-session] .login-modal.open{ display: none; }
+    .modal-card{
+      background: #fff;
+      border-radius: var(--radius);
+      max-width: 920px;
+      width: 100%;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      padding: 24px;
+    }
+    .modal-head{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--gray-2);
+      flex-shrink: 0;
+    }
+    .modal-head h2{
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .close{
+      background: var(--gray-2);
+      border: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .close:hover{ background: var(--gray-3); }
+
+    /* ===== 确认模态框 ===== */
+    .confirm-modal .confirm-card{
+      max-width: 380px;
+      padding: 32px 28px 28px;
+      text-align: center;
+      border-radius: 20px;
+    }
+    .confirm-icon{ font-size: 48px; margin-bottom: 16px; }
+    .confirm-title{ font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; }
+    .confirm-message{ font-size: 15px; color: #666; line-height: 1.6; margin-bottom: 24px; }
+    .confirm-buttons{ display: flex; gap: 12px; justify-content: center; }
+    .confirm-cancel, .confirm-ok{
+      flex: 1; padding: 12px 24px; border: 0; border-radius: 12px;
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+    }
+    .confirm-cancel{ background: #f0f0f5; color: #666; }
+    .confirm-cancel:hover{ background: #e4e4ec; }
+    .confirm-ok{ background: linear-gradient(135deg, #e85d3a, #e84a2a); color: #fff; }
+    .confirm-ok:hover{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(232,93,58,0.3); }
+
+    /* ===== 登录模态框（毛玻璃卡片） ===== */
+    .login-modal .modal-card{
+      max-width: 420px;
+      padding: 32px 28px 28px;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.3);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.15);
+      position: relative;
+      z-index: 1;
+    }
+    .login-modal .modal-head{
+      border-bottom: none;
+      padding-bottom: 8px;
+    }
+    .login-modal .modal-head h2{
+      font-size: 26px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .login-modal .modal-head h2 .brand-icon{
+      font-size: 32px;
+    }
+    .login-modal .form-group{
+      margin-bottom: 14px;
+    }
+    .login-modal .form-group input{
+      width: 100%;
+      height: 48px;
+      padding: 0 16px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--gray-3);
+      font-size: 15px;
+      transition: var(--transition);
+      background: rgba(255,255,255,0.8);
+    }
+    .login-modal .form-group input:focus{
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(232,74,42,0.12);
+      background: #fff;
+    }
+    .login-modal .form-group label{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-5);
+      cursor: pointer;
+    }
+    .login-modal .form-group label input[type="checkbox"]{
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+    .login-modal .history-users{
+      margin: 6px 0 12px;
+    }
+    .login-modal .history-users .label{
+      font-size: 13px;
+      color: var(--gray-4);
+      margin-bottom: 6px;
+    }
+    .login-modal .history-users .user-badge{
+      display: inline-block;
+      background: rgba(255,255,255,0.7);
+      border: 1px solid var(--gray-3);
+      border-radius: 30px;
+      padding: 4px 18px;
+      margin: 3px 6px 3px 0;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-6);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .login-modal .history-users .user-badge:hover{
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .login-btn{
+      width: 100%;
+      height: 50px;
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: var(--primary);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+      margin-top: 4px;
+    }
+    .login-btn:hover{ background: var(--primary-dark); transform: translateY(-1px); }
+    .login-btn:active{ transform: scale(0.97); }
+    .login-error{
+      color: var(--primary);
+      margin-top: 10px;
+      font-size: 14px;
+      text-align: center;
+      min-height: 22px;
+    }
+    .login-sub{
+      text-align: center;
+      color: var(--gray-4);
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    /* 登录窗口语言选择器 */
+    .login-lang-select{
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 8px;
+    }
+    .login-lang-select select{
+      background: rgba(255,255,255,0.6);
+      border: 1px solid var(--gray-3);
+      border-radius: 30px;
+      padding: 4px 14px;
+      font-size: 13px;
+      color: var(--gray-6);
+      cursor: pointer;
+      outline: none;
+    }
+    .login-lang-select select:focus{
+      border-color: var(--primary);
+    }
+
+    /* ===== 点餐弹窗内部 ===== */
+    .current-table{
+      background: var(--primary-bg);
+      border: 1px solid #f5d5c8;
+      color: var(--primary-dark);
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      flex: 1;
+    }
+    .modal-head .current-table{
+      margin-bottom: 0;
+      background: transparent;
+      border: none;
+      padding: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .selected-items{
+      flex-shrink: 0;
+      background: var(--gray-1);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      max-height: 110px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .selected-items::-webkit-scrollbar{ display: none; }
+    .selected-items .title{
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--gray-5);
+    }
+    .selected-item{
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--gray-2);
+    }
+    .selected-item:last-child{ border-bottom: 0; }
+    .selected-item .sel-name{
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .item-status.new{
+      background: var(--primary-bg);
+      color: var(--primary);
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .selected-item .sel-price{
+      color: var(--gray-5);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    /* 已选菜品的加减数量按钮，复用点菜列表里的圆形按钮样式，保持风格统一 */
+    .selected-item .qty{ gap: 4px; }
+    .selected-item .qty button{ width: 26px; height: 26px; font-size: 14px; }
+    .selected-item .qty span{ min-width: 18px; font-size: 13px; }
+    .selected-item .remove-btn{
+      background: #fee8e6;
+      border: 0;
+      color: var(--primary);
+      padding: 2px 10px;
+      border-radius: 30px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition);
+    }
+    .selected-item .remove-btn:hover{ background: #fdd5d0; }
+
+    .dish-categories{
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 8px 0;
+      margin-bottom: 8px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      flex-shrink: 0;
+    }
+    .dish-categories::-webkit-scrollbar{ display: none; }
+    .dish-categories .cat-btn{
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--gray-3);
+      background: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .dish-categories .cat-btn:hover{
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .dish-categories .cat-btn.active{
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+      font-weight: 600;
+    }
+    .dish-list{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 2px 12px 0;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .dish-list::-webkit-scrollbar{ display: none; }
+    .dish-item{
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--gray-1);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      border: 1px solid var(--gray-2);
+      transition: var(--transition);
+    }
+    .dish-item:hover{ background: #fff; border-color: var(--gray-3); }
+    .dish-thumb{
+      width: 56px;
+      height: 56px;
+      border-radius: var(--radius-sm);
+      background: var(--gray-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .dish-thumb img{ width:100%; height:100%; object-fit:cover; }
+    .dish-item .info{ flex:1; min-width:0; }
+    .dish-item .info .name{ font-weight:600; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dish-item .info .price{ color: var(--primary); font-size:14px; font-weight:500; }
+    .price-secondary{ font-size:12px; color: var(--gray-4); margin-left:4px; }
+
+    .qty{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;      /* 之前没设置，.dish-item 是 flex 布局，窄屏下 +/- 按钮和数量会被挤压裁切 */
+      white-space: nowrap;
+    }
+    .qty button{
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--gray-3);
+      background: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qty button:hover{ border-color: var(--primary); color: var(--primary); }
+    .qty span{
+      min-width: 24px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .footer{
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 16px;
+      margin-top: 12px;
+      border-top: 1px solid var(--gray-2);
+    }
+    .footer .total{
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .submit-btn{
+      background: var(--primary);
+      border: 0;
+      color: #fff;
+      padding: 10px 28px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .submit-btn:hover{ background: var(--primary-dark); transform: translateY(-2px); }
+    .submit-btn:active{ transform: scale(0.97); }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 600px) {
+      header{
+        padding: 10px 14px; gap: 8px;
+        display: flex !important;
+        flex-wrap: wrap !important;
+      }
+      header .header-title{
+        position: static !important;
+        transform: none !important;
+        order: 0;
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+        font-size: 17px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.15);
+      }
+      header .header-right{
+        order: 2;
+        margin-left: 0 !important;
+        flex: 1;
+        justify-content: flex-end;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+      }
+      header .header-left{
+        order: 1;
+        margin-left: 0 !important;
+        gap: 6px !important;
+      }
+      header .header-btn{
+        padding: 4px 10px !important;
+        font-size: 12px !important;
+      }
+      header .icon-btn{
+        width: 30px !important;
+        height: 30px !important;
+        min-width: 30px !important;
+        font-size: 14px !important;
+      }
+      header .waiter-name,
+      header .store-name{
+        padding: 3px 10px !important;
+        font-size: 12px !important;
+      }
+      .login-modal .modal-card{ padding: 24px 18px 20px; }
+      .dish-list{ grid-template-columns: 1fr; }
+      .table-grid{ grid-template-columns: 1fr; }
+    }
+    @media (max-width: 400px) {
+
+    }
+    @media (max-width: 480px) {
+      .selected-item{ grid-template-columns: 1fr auto auto; row-gap: 4px; }
+      .selected-item .sel-price{ grid-column: 1 / 2; font-size: 12px; }
+      .auto-refresh-toggle span:not(.title){ display: none; }
+      .auto-refresh-toggle{ padding: 5px 10px; }
+    }
+  </style>
+  <link rel="stylesheet" href="assets/common.css">
+</head>
+<body>
+
+<!-- ===== Toast ===== -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== 主界面头部 ===== -->
+<header id="mainHeader" style="display:none;">
+  <div class="header-title" id="waiterTitle">🍴 FoodFlow</div>
+  <div class="header-left">
+    <span class="store-name" id="storeNameDisplay" style="display:none;"></span>
+    <span class="waiter-name" id="waiterNameDisplay"></span>
+  </div>
+  <div class="header-right">
+    <button class="call-notification-btn icon-btn" id="callNotificationBtn" onclick="showCallNotifications()" style="display:none;" title="呼叫通知">
+      🔔 <span id="callNotificationCount">0</span>
+    </button>
+    <button class="header-btn icon-btn" onclick="showOrderHistory()" id="orderHistoryBtn" title="订单历史">
+      📋
+    </button>
+    <div class="lang-btn-wrap">
+      <span class="lang-icon">🌐</span>
+      <select id="waiterLang">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+        <option value="vi">Tiếng Việt</option>
+        <option value="th">ภาษาไทย</option>
+        <option value="km">ភាសាខ្មែរ</option>
+      </select>
+    </div>
+    <button class="header-btn icon-btn logout-btn" id="logoutBtn" title="退出登录">🚪</button>
+  </div>
+</header>
+
+<!-- ===== 主内容 ===== -->
+<main id="mainContent" style="display:none;">
+  <div class="table-grid" id="tableGrid"></div>
+</main>
+
+<!-- ===== 订单历史模态框 ===== -->
+<div class="modal" id="orderHistoryModal">
+  <div class="modal-card" style="max-width:700px;max-height:85vh;">
+    <div class="modal-head">
+      <h2 id="orderHistoryTitle">📋 订单历史</h2>
+      <button class="close" onclick="hideOrderHistory()">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+      <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
+        <select id="historyStatusFilter" onchange="loadOrderHistory()" style="padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;">
+          <option value="">全部状态</option>
+          <option value="pending">制作中</option>
+          <option value="done">已完成</option>
+          <option value="canceled">已取消</option>
+        </select>
+        <input type="date" id="historyDateFilter" onchange="loadOrderHistory()" style="padding:8px 12px;border-radius:8px;border:1px solid #ddd;">
+      </div>
+      <div id="orderHistoryList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 订单详情模态框 ===== -->
+<div class="modal" id="orderDetailModal">
+  <div class="modal-card" style="max-width:500px;max-height:85vh;">
+    <div class="modal-head">
+      <h2 id="orderDetailTitle">订单详情</h2>
+      <button class="close" onclick="hideOrderDetail()">✕</button>
+    </div>
+    <div class="modal-body scroll-hide" id="orderDetailContent" style="max-height:60vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- ===== 点餐模态框 ===== -->
+<div class="modal" id="orderModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="current-table" id="currentTableBadge">当前桌号：</div>
+      <button class="close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="selected-items" id="selectedItems"></div>
+    <div class="dish-categories" id="dishCategories"></div>
+    <div class="dish-list" id="dishList"></div>
+    <div class="footer">
+      <span class="total" id="orderTotal">¥0.00</span>
+      <button class="submit-btn" id="submitBtn">提交订单</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 确认模态框 ===== -->
+<div class="modal confirm-modal" id="confirmModal">
+  <div class="modal-card confirm-card">
+    <div class="confirm-icon">⚠️</div>
+    <div class="confirm-title" id="confirmTitle">确认操作</div>
+    <div class="confirm-message" id="confirmMessage">确定要执行此操作吗？</div>
+    <div class="confirm-buttons">
+      <button class="confirm-cancel" id="confirmCancelBtn">取消</button>
+      <button class="confirm-ok" id="confirmOkBtn">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 订单选择模态框 ===== -->
+<div class="modal" id="orderSelectModal">
+  <div class="modal-card" style="max-width:400px;">
+    <div class="modal-head">
+      <div class="current-table" id="orderSelectTitle">选择订单</div>
+      <button class="close" onclick="closeOrderSelect()">✕</button>
+    </div>
+    <div id="orderSelectList" style="max-height:400px;overflow-y:auto;"></div>
+    <div style="padding:12px 0 0;border-top:1px solid var(--gray-2);margin-top:8px;">
+      <button class="submit-btn" style="width:100%;" onclick="createNewOrderFromSelect()">➕ 创建新订单</button>
+    </div>
+  </div>
+</div>
+
+<script src="languages.min.js"></script>
+<script src="assets/common.js"></script>
+<script>
+  // 初始化统一 i18n（合并 LANGUAGES 和本地词典）
+  SLF.i18n.init(localStorage.getItem('waiterLang') || 'zh');
+  // 安全兜底：确保 SLF.audio 存在，避免旧版本common.js或加载异常导致崩溃
+  if (!SLF.audio) {
+    SLF.audio = {
+      _enabled: true,
+      setEnabled(v) { this._enabled = !!v; },
+      isEnabled() { return this._enabled; },
+      unlock() {},
+      playNewOrderChime() {},
+      playCallChime() {},
+    };
+  }
+</script>
+<script>
+  // ================================================================
+  //  工具函数（双币支持）
+  // ================================================================
+  function toBaseCurrency(price, currencyCode) {
+    const currency = state.currencies.find(c => c.code === currencyCode) || { rate: 1 };
+    return Number(price || 0) / Number(currency.rate || 1);
+  }
+  function formatPrimary(amount) {
+    const c = state.defaultCurrency || { symbol: '$', rate: 1, code: 'USD' };
+    return `${c.symbol}${(Number(amount || 0) * Number(c.rate || 1)).toFixed(2)}`;
+  }
+  function formatSecondary(amount, secondaryCode) {
+    if (!secondaryCode) return '';
+    const secCurr = state.currencies.find(c => c.code === secondaryCode);
+    if (!secCurr) return '';
+    const defaultRate = (state.defaultCurrency && state.defaultCurrency.rate) || 1;
+    const secValue = (Number(amount || 0) / defaultRate) * Number(secCurr.rate || 1);
+    return `${secCurr.symbol}${secValue.toFixed(2)}`;
+  }
+  function getMenuPrices(item) {
+    const base = toBaseCurrency(item.price, item.currency_code);
+    const primary = formatPrimary(base);
+    let secondary = '';
+    if (state.dualCurrency.enabled && item.secondary_currency_code) {
+      secondary = formatSecondary(base, item.secondary_currency_code);
+    }
+    return { primary, secondary };
+  }
+
+  // ================================================================
+  //  核心状态与API
+  // ================================================================
+  const API='/api';const $=s=>document.querySelector(s);
+  const state={tables:[],orders:[],menu:[],cart:{},cartMeta:{},currentTable:null,currencies:[],defaultCurrency:{symbol:'$',rate:1,code:'USD'},dualCurrency:{enabled:false,currency:null},waiter:null,token:localStorage.getItem('waiterToken')||'',editingOrderId:null,lockedItems:[],storeId:null,storeName:''};
+  const WAITER_TEXT={
+    zh:{title:'🍴 FoodFlow',loginTitle:'服务员登录',username:'账号',password:'密码',rememberLogin:'保持登录',remove:'移除',noTables:'暂无桌号',completed:'已完成',noPending:'暂无未结算订单',pending:'制作中',canceled:'已取消',allStatus:'全部状态',urgeOrder:'催单',noCalls:'暂无呼叫',handled:'已处理',handleFailed:'处理失败',currentTable:'当前桌号',ordering:'点餐',selectedDishes:'已选菜品',emptySelected:'尚未选择菜品',submitOrder:'提交订单',unit:'份',saveChanges:'保存修改',order:'订单',orderHistory:'订单历史',orderTime:'下单时间',dishes:'道菜品',note:'备注',total:'合计',noOrders:'暂无订单',dishServed:'菜品已上菜',orderCompleted:'结算订单',orderUpdated:'制作中订单已修改',orderSubmitted:'订单已提交',confirmSubmit:'确认提交此订单？',confirmServe:'确认该菜品已上菜？',confirmComplete:'确认结算该订单？',pleaseLogin:'请输入账号和密码',loginFailed:'登录失败',selectDish:'请先选择菜品',logout:'退出登录',recentUsers:'最近登录',autoRefresh:'自动刷新',confirmLogout:'确认退出登录吗？',cancel:'取消',confirm:'确定',confirmTitle:'确认操作',orderPrinted:'订单已打印',print:'打印',customer:'客',staffOrder:'服务员下单',newItem:'新下单',selectOrder:'选择订单'},
+    en:{title:'🍴 FoodFlow',loginTitle:'Waiter Login',username:'Username',password:'Password',rememberLogin:'Keep me logged in',remove:'Remove',noTables:'No tables',completed:'Completed',pending:'In Progress',canceled:'Canceled',allStatus:'All Status',noPending:'No unsettled orders',urgeOrder:'Urge Order',noCalls:'No calls',handled:'Handled',handleFailed:'Handle failed',currentTable:'Current Table',ordering:'Order',selectedDishes:'Selected Dishes',emptySelected:'No dishes selected',submitOrder:'Submit Order',unit:'serving',saveChanges:'Save Changes',order:'Order',orderHistory:'Order History',orderTime:'Order Time',dishes:'items',note:'Note',total:'Total',noOrders:'No orders',dishServed:'Dish served',orderCompleted:'Settle Order',orderUpdated:'Pending order updated',orderSubmitted:'Order submitted',confirmSubmit:'Confirm submitting this order?',confirmServe:'Confirm this dish is served?',confirmComplete:'Confirm settling this order?',pleaseLogin:'Please enter username and password',loginFailed:'Login failed',selectDish:'Please select dishes first',logout:'Logout',recentUsers:'Recent Users',autoRefresh:'Auto refresh',confirmLogout:'Confirm logout?',cancel:'Cancel',confirm:'Confirm',confirmTitle:'Confirm Action',orderPrinted:'Order printed',print:'Print',customer:'Cust',staffOrder:'Staff Order',newItem:'New',selectOrder:'Select Order'},
+    vi:{title:'🍴 FoodFlow',loginTitle:'Đăng nhập nhân viên',username:'Tài khoản',password:'Mật khẩu',rememberLogin:'Giữ đăng nhập',remove:'Xóa',noTables:'Chưa có bàn',completed:'Hoàn thành',noPending:'Chưa có đơn chờ',pending:'Đang làm',canceled:'Đã hủy',allStatus:'Tất cả trạng thái',urgeOrder:'Nhắc đơn',noCalls:'Chưa có gọi',handled:'Đã xử lý',handleFailed:'Xử lý thất bại',orderHistory:'Lịch sử đơn',orderTime:'Thời gian đặt',dishes:'món',note:'Ghi chú',total:'Tổng cộng',noOrders:'Chưa có đơn',currentTable:'Bàn hiện tại',ordering:'Gọi món',selectedDishes:'Món đã chọn',emptySelected:'Chưa chọn món',submitOrder:'Gửi đơn',unit:'phần',saveChanges:'Lưu thay đổi',order:'Đơn',dishServed:'Món đã lên',orderCompleted:'Đơn đã hoàn thành',orderUpdated:'Đơn đang làm đã cập nhật',orderSubmitted:'Đơn đã gửi',confirmSubmit:'Xác nhận gửi đơn này?',confirmServe:'Xác nhận món này đã lên?',confirmComplete:'Xác nhận hoàn thành đơn?',pleaseLogin:'Vui lòng nhập tài khoản và mật khẩu',loginFailed:'Đăng nhập thất bại',selectDish:'Vui lòng chọn món trước',logout:'Đăng xuất',recentUsers:'Người dùng gần đây',autoRefresh:'Tự động làm mới',confirmLogout:'Xác nhận đăng xuất?',cancel:'Hủy',confirm:'Xác nhận',confirmTitle:'Xác nhận thao tác',orderPrinted:'Đơn hàng đã in',print:'In',customer:'KH',staffOrder:'Nhân viên đặt',newItem:'Mới',selectOrder:'Chọn đơn'},
+    th:{title:'🍴 FoodFlow',loginTitle:'เข้าสู่ระบบพนักงาน',username:'บัญชีผู้ใช้',password:'รหัสผ่าน',rememberLogin:'จดจำการเข้าสู่ระบบ',remove:'ลบ',noTables:'ไม่มีโต๊ะ',completed:'เสร็จสิ้น',noPending:'ไม่มีออเดอร์ที่กำลังทำ',pending:'กำลังทำ',canceled:'ยกเลิก',allStatus:'ทุกสถานะ',urgeOrder:'เร่งออเดอร์',noCalls:'ไม่มีการเรียก',handled:'จัดการแล้ว',handleFailed:'จัดการล้มเหลว',orderHistory:'ประวัติออเดอร์',orderTime:'เวลาสั่ง',dishes:'เมนู',note:'หมายเหตุ',total:'รวมทั้งหมด',noOrders:'ไม่มีออเดอร์',currentTable:'โต๊ะปัจจุบัน',ordering:'สั่งอาหาร',selectedDishes:'เมนูที่เลือก',emptySelected:'ยังไม่ได้เลือกเมนู',submitOrder:'ส่งออเดอร์',unit:'เสิร์ฟ',saveChanges:'บันทึกการแก้ไข',order:'ออเดอร์',dishServed:'เสิร์ฟเมนูแล้ว',orderCompleted:'ออเดอร์เสร็จแล้ว',orderUpdated:'ออเดอร์ที่กำลังทำอัปเดตแล้ว',orderSubmitted:'ส่งออเดอร์แล้ว',confirmSubmit:'ยืนยันส่งออเดอร์นี้?',confirmServe:'ยืนยันเสิร์ฟเมนูนี้?',confirmComplete:'ยืนยันเสร็จออเดอร์นี้?',pleaseLogin:'กรุณากรอกบัญชีและรหัสผ่าน',loginFailed:'เข้าสู่ระบบล้มเหลว',selectDish:'กรุณาเลือกเมนูก่อน',logout:'ออกจากระบบ',recentUsers:'ผู้ใช้ล่าสุด',autoRefresh:'รีเฟรชอัตโนมัติ',confirmLogout:'ยืนยันการออกจากระบบ?',cancel:'ยกเลิก',confirm:'ยืนยัน',confirmTitle:'ยืนยันการดำเนินการ',orderPrinted:'พิมพ์ออเดอร์แล้ว',print:'พิมพ์',customer:'ลูกค้า',staffOrder:'พนักงานสั่ง',newItem:'ใหม่',selectOrder:'เลือกออเดอร์'},
+    km:{title:'🍴 FoodFlow',loginTitle:'ចូលបុគ្គលិក',username:'គណនី',password:'ពាក្យសម្ងាត់',rememberLogin:'រក្សាការចូល',remove:'លុប',noTables:'គ្មានតុ',completed:'រួចរាល់',noPending:'គ្មានការបញ្ជាទិញកំពុងដំណើរការ',pending:'កំពុងដំណើរការ',canceled:'បានបោះបង់',allStatus:'គ្រប់ស្ថានភាព',urgeOrder:'បង្កាន់ដៃ',noCalls:'គ្មានការហៅ',handled:'បានដោះស្រាយ',handleFailed:'ដោះស្រាយបរាជ័យ',orderHistory:'ប្រវត្តិការបញ្ជាទិញ',orderTime:'ពេលវេលាបញ្ជាទិញ',dishes:'មុខម្ហូប',note:'កំណត់ចំណាំ',total:'សរុប',noOrders:'គ្មានការបញ្ជាទិញ',currentTable:'តុបច្ចុប្បន្ន',ordering:'បញ្ជាទិញ',selectedDishes:'ម្ហូបដែលបានជ្រើស',emptySelected:'មិនទាន់ជ្រើសម្ហូប',submitOrder:'បញ្ជូនការបញ្ជាទិញ',unit:'មុខ',saveChanges:'រក្សាទុកការកែ',order:'ការបញ្ជាទិញ',dishServed:'ម្ហូបបានដាក់ជូន',orderCompleted:'ការបញ្ជាទិញបានបញ្ចប់',orderUpdated:'ការបញ្ជាទិញកំពុងដំណើរការបានធ្វើបច្ចុប្បន្នភាព',orderSubmitted:'ការបញ្ជាទិញបានបញ្ជូន',confirmSubmit:'បញ្ជាក់បញ្ជូនការបញ្ជាទិញនេះ?',confirmServe:'បញ្ជាក់ម្ហូបនេះបានដាក់ជូន?',confirmComplete:'បញ្ជាក់បញ្ចប់ការបញ្ជាទិញនេះ?',pleaseLogin:'សូមបញ្ចូលគណនីនិងពាក្យសម្ងាត់',loginFailed:'ចូលបរាជ័យ',selectDish:'សូមជ្រើសម្ហូបជាមុន',logout:'ចាកចេញ',recentUsers:'អ្នកប្រើថ្មីៗ',autoRefresh:'ធ្វើបច្ចុប្បន្នភាពស្វ័យប្រវត្តិ',confirmLogout:'បញ្ជាក់ការចាកចេញ?',cancel:'បោះបង់',confirm:'បញ្ជាក់',confirmTitle:'បញ្ជាក់ប្រតិបត្តិការ',orderPrinted:'បោះពុម្ពការបញ្ជាទិញរួចរាល់',print:'បោះពុម្ព',customer:'អតិថិជន',staffOrder:'បុគ្គលិកបញ្ជាទិញ',newItem:'ថ្មី',selectOrder:'ជ្រើសរើសការបញ្ជាទិញ'}
+  };
+  let waiterLang=localStorage.getItem('waiterLang')||'zh';
+  // 本地字典优先，找不到时回退到 languages.js 的共享翻译（如 available/occupied/pending/canceled/orderPending/orderDone），避免重复维护同一个词
+  const wt=k=>(WAITER_TEXT[waiterLang]&&WAITER_TEXT[waiterLang][k])||WAITER_TEXT.zh[k]||(LANGUAGES[waiterLang]&&LANGUAGES[waiterLang][k])||(LANGUAGES.zh&&LANGUAGES.zh[k])||k;
+  // 简单 HTML 转义，避免顾客备注中的特殊字符破坏页面结构
+  function escNote(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function applyWaiterLanguage(){$('#waiterTitle').textContent=wt('title');$('#logoutBtn').title=wt('logout');$('#waiterLang').value=waiterLang;$('#currentTableBadge').textContent=wt('currentTable')+': ';$('#submitBtn').textContent=wt('submitOrder');$('#confirmCancelBtn').textContent=wt('cancel')||'取消';$('#confirmOkBtn').textContent=wt('confirm')||'确定';const historyBtn=$('#orderHistoryBtn');if(historyBtn)historyBtn.title=wt('orderHistory');const callBtn=$('#callNotificationBtnText');if(callBtn)callBtn.textContent=wt('callWaiter');renderTables();}
+  let confirmCallback=null;
+  function showConfirm(message,callback,title){$('#confirmTitle').textContent=title||wt('confirmTitle')||'确认操作';$('#confirmMessage').textContent=message;confirmCallback=callback;$('#confirmModal').classList.add('open');}
+  function hideConfirm(){$('#confirmModal').classList.remove('open');confirmCallback=null;}
+  $('#confirmCancelBtn').onclick=hideConfirm;
+  $('#confirmOkBtn').onclick=function(){if(confirmCallback)confirmCallback();hideConfirm();};
+  $('#confirmModal').onclick=function(e){if(e.target===this)hideConfirm();};
+  async function api(path,opt={}){const headers=new Headers(opt.headers||{});if(state.token)headers.set('X-Waiter-Token',state.token);const r=await fetch(API+path,{...opt,headers});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'请求失败');return d}
+
+  // ----- 退出登录 -----
+  function logoutWaiter(){
+    stopCallPolling();
+    state.token='';localStorage.removeItem('waiterToken');
+    localStorage.removeItem('storeId');
+    document.documentElement.removeAttribute('data-waiter-session');
+    knownWaiterOrderIds=null;
+    stopWaiterAutoRefresh();
+    if(waiterIdleTimer){clearTimeout(waiterIdleTimer);waiterIdleTimer=null;}
+    window.location.href = '/login?type=waiter';
+  }
+
+  // ----- 空闲超时 -----
+  let waiterIdleTimer=null;
+  function resetWaiterIdle(){clearTimeout(waiterIdleTimer);if(localStorage.getItem('waiterRemember')!=='1' && state.token){waiterIdleTimer=setTimeout(logoutWaiter,20*60*1000);}}
+  ['click','keydown','mousemove','scroll','touchstart'].forEach(evt=>document.addEventListener(evt,resetWaiterIdle,{passive:true}));
+
+
+
+  // ----- 退出按钮 -----
+  $('#logoutBtn').onclick=function(){showConfirm(wt('confirmLogout'),logoutWaiter);};
+
+  // ----- Toast -----
+  function toast(m){const n=$('#toast');n.textContent=m;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),1800);}
+
+  // ----- 状态与渲染 -----
+  function status(table){const active=state.orders.filter(o=>o.table===table.name&&o.status==='pending');return active.length?wt('occupied'):wt('available');}
+  function formatMoney(amount, showSecondary = true){
+    const primary=formatPrimary(amount);
+    let secondary='';
+    if(showSecondary && state.dualCurrency.enabled && state.dualCurrency.currency){
+      secondary=formatSecondary(amount, state.dualCurrency.currency.code);
+    }
+    return secondary ? `${primary} (${secondary})` : primary;
+  }
+  // 同一桌可能被多位顾客先后扫码下单：按 session_token 分组，给每组分配短标签（客1/客2...），
+  // 没有 session_token 的订单（服务员代下单）单独标注，帮助服务员区分是同一顾客的多笔订单还是不同顾客。
+  // 根据客人标签返回对应颜色
+  function getCustomerColor(label){
+    const colors = [
+      {bg: 'rgba(123, 104, 238, .15)', color: '#7b68ee'},  // 客1 - 紫色
+      {bg: 'rgba(232, 93, 58, .15)', color: '#e85d3a'},   // 客2 - 橙色
+      {bg: 'rgba(46, 204, 113, .15)', color: '#2ecc71'},  // 客3 - 绿色
+      {bg: 'rgba(52, 152, 219, .15)', color: '#3498db'},  // 客4 - 蓝色
+      {bg: 'rgba(241, 196, 15, .15)', color: '#f39c12'},  // 客5 - 黄色
+      {bg: 'rgba(231, 76, 60, .15)', color: '#e74c3c'},   // 客6 - 红色
+      {bg: 'rgba(26, 188, 156, .15)', color: '#1abc9c'},  // 客7 - 青色
+      {bg: 'rgba(155, 89, 182, .15)', color: '#9b59b6'},  // 客8 - 品红
+      {bg: 'rgba(52, 73, 94, .15)', color: '#34495e'},    // 客9 - 深蓝灰
+      {bg: 'rgba(230, 126, 34, .15)', color: '#e67e22'},  // 客10 - 深橙
+      {bg: 'rgba(39, 174, 96, .15)', color: '#27ae60'},   // 客11 - 深绿
+      {bg: 'rgba(41, 128, 185, .15)', color: '#2980b9'},  // 客12 - 深蓝
+    ];
+    const match = label.match(/\d+/);
+    if(match){
+      const idx = (parseInt(match[0]) - 1) % colors.length;
+      return colors[idx];
+    }
+    // 服务员下单用灰色
+    return {bg: 'rgba(149, 165, 166, .15)', color: '#95a5a6'};
+  }
+  function buildSessionLabels(orders){
+    // 按创建时间排序，确保新扫码的客户分配更大的编号
+    const sorted=[...orders].sort((a,b)=>{
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return ta - tb;
+    });
+    const distinctTokens=[...new Set(sorted.filter(o=>o.sessionToken).map(o=>o.sessionToken))];
+    const labels=new Map();
+    const tokenToIndex=new Map(distinctTokens.map((t,i)=>[t,i+1]));
+    for(const o of sorted){
+      labels.set(o.id, o.sessionToken ? `${wt('customer')}${tokenToIndex.get(o.sessionToken)}` : wt('staffOrder'));
+    }
+    return labels;
+  }
+  function bill(table){
+    const active=state.orders.filter(o=>o.table===table.name&&o.status==='pending');
+    const totalBase=active.reduce((s,o)=>s+Number(o.total||0),0);
+    const totalDisplay=formatMoney(totalBase);
+    const sessionLabels=buildSessionLabels(active);
+    const blocks=active.slice(0,5).map(o=>{
+      const orderTotalBase=o.items.reduce((s,item)=>s+toBaseCurrency(item.price, item.currency_code)*item.quantity,0);
+      const orderTotalDisplay=formatMoney(orderTotalBase);
+      const lines=o.items.map((i,idx)=>{
+        const prices=getMenuPrices(i);
+        let priceDisplay=prices.primary;
+        if(prices.secondary) priceDisplay += ` (${prices.secondary})`;
+        return `<div class="line"><span class="dish-name">${esc(i.name)} ×${i.quantity}</span><span class="line-amount">${priceDisplay}</span>${i.itemStatus==='done'?`<span class="item-status done">${wt('completed')}</span>`:(state.waiter&&state.waiter.can_mark_item?`<button class="item-toggle" onclick="event.stopPropagation();toggleWaiterItem(${o.id},${idx})">${wt('pending')}</button>`:'')}</div>`;
+      }).join('');
+      const timeLabel=o.createdAt?SLF.utils.formatDateTime(o.createdAt):'';
+      const badgeLabel=sessionLabels.get(o.id);
+      const badgeColor=badgeLabel?getCustomerColor(badgeLabel):null;
+      const badge=badgeLabel?`<span class="session-badge" style="background:${badgeColor.bg};color:${badgeColor.color};">${badgeLabel}</span>`:'';
+      const noteHtml=o.note?`<div class="order-note" style="margin:4px 0 6px;padding:6px 8px;border-radius:6px;background:rgba(255,193,7,.15);font-size:12px;color:#c98a1f;line-height:1.4;"><strong>${wt('orderNoteDisplay')}：</strong>${escNote(o.note)}</div>`:'';
+      // 每张订单独立的结算按钮，显示在订单头部靠右
+      const orderSettleBtn = (state.waiter&&state.waiter.can_complete_order) ? `<button onclick="event.stopPropagation();completeWaiterOrder(${o.id})" style="background:var(--primary);color:#fff;border:none;padding:5px 14px;border-radius:16px;font-size:12px;cursor:pointer;font-weight:600;flex-shrink:0;">${wt('settleOrder')}</button>` : '';
+      return `<div class="order-block"><div class="order-head" style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><span>#${o.id} · ${wt('orderPending')}${badge}<span class="order-meta"> · ${timeLabel}</span></span>${orderSettleBtn}</div>${noteHtml}<div class="bill-items">${lines}</div></div>`;
+    }).join('');
+    return active.length ? `<div class="amount" style="display:flex;align-items:center;justify-content:space-between;">${active.length} ${wt('order')} · ${totalDisplay}</div>${blocks}` : `<div class="amount" style="color:#c8c8d0">${wt('noCustomerOrder')}</div>`;
+  }
+  async function toggleWaiterItem(id,index){try{const order=state.orders.find(o=>o.id===id);if(!order||!order.items[index])return;const next=order.items[index].itemStatus==='done'?'pending':'done';await api(`/orders/${id}/items/${index}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemStatus:next})});toast('✅ '+wt('orderUpdated'));await load()}catch(e){toast('❌ '+e.message)}}
+  async function completeWaiterOrder(id){showConfirm(wt('confirmComplete'),async function(){try{await api(`/orders/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})});toast('✅ '+wt('settleOrder'));await load()}catch(e){const msg=e.message.includes('未完成菜品')?wt('incompleteItemsError')||LANGUAGES[waiterLang].incompleteItemsError:e.message;toast('❌ '+msg)}});}
+
+  // ----- 加载数据 -----
+  async function load(){
+    if(!state.token){logoutWaiter();return}
+    try{
+      const [overview, menuRes, configRes] = await Promise.all([
+        api('/waiter/overview'),
+        fetch(API+'/menu').then(r=>r.json()),
+        fetch(API+'/public/config').then(r=>r.json())
+      ]);
+      detectNewWaiterOrders(overview.orders || []);
+      state.tables=overview.tables;state.orders=overview.orders;state.waiter=overview.waiter;state.menu=menuRes;
+      state.currencies=configRes.currencies||[];state.defaultCurrency=configRes.defaultCurrency||state.defaultCurrency;
+      state.dualCurrency=configRes.dualCurrency||{enabled:false,currency:null};
+      if(typeof configRes.newOrderSoundEnabled==='boolean' && SLF.audio) SLF.audio.setEnabled(configRes.newOrderSoundEnabled);
+      // 启动自动刷新（间隔由超级管理员后台配置）
+      startWaiterAutoRefresh(configRes.waiter_refresh_interval || 8);
+      if(state.dualCurrency.enabled && !state.dualCurrency.currency){
+        const defaultSec=state.currencies.find(c=>c.code==='USD')||state.currencies[0];
+        if(defaultSec) state.dualCurrency.currency=defaultSec;
+      }
+      
+      $('#mainHeader').style.display='flex';
+      $('#mainContent').style.display='block';
+      if(state.waiter && state.waiter.display_name) $('#waiterNameDisplay').textContent='👤 '+state.waiter.display_name;
+      if(state.waiter) loadStoreInfo(state.waiter.store_id || 1);
+      renderTables();
+    }catch(e){toast('❌ '+e.message);if(e.message.includes('请先登录')) logoutWaiter();}
+  }
+
+  // ----- 新订单提示音（总开关由后台控制） -----
+  let knownWaiterOrderIds=null;
+
+  // 与已知的待处理订单号对比，出现新订单号时播放提示音；首次加载不触发，避免刚打开页面就响
+  function detectNewWaiterOrders(orders){
+    const pendingIds=new Set((orders||[]).filter(o=>o.status==='pending').map(o=>o.id));
+    if(knownWaiterOrderIds!==null){
+      let hasNew=false;
+      for(const id of pendingIds){ if(!knownWaiterOrderIds.has(id)){ hasNew=true; break; } }
+      if(hasNew && SLF.audio) SLF.audio.playNewOrderChime();
+    }
+    knownWaiterOrderIds=pendingIds;
+  }
+  // 音频解锁：任何用户交互都解锁音频上下文
+  ['click', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+    document.addEventListener(evt, () => { if(SLF.audio) SLF.audio.unlock(); }, { passive: true });
+  });
+
+  // ----- 服务员所属店铺 -----
+  // 登录返回和概览接口都只带 store_id，店铺名称需要单独查询一次，之后缓存起来避免重复请求
+  async function loadStoreInfo(storeId){
+    if(!storeId) return;
+    if(state.storeId===storeId && state.storeName){ $('#storeNameDisplay').textContent='🏬 '+state.storeName; $('#storeNameDisplay').style.display='inline-block'; return; }
+    try{
+      const info=await fetch(API+'/public/store-info?store_id='+storeId).then(r=>r.json());
+      if(info && info.name){
+        state.storeId=storeId;state.storeName=info.name;
+        $('#storeNameDisplay').textContent='🏬 '+info.name;
+        $('#storeNameDisplay').style.display='inline-block';
+      }
+    }catch(e){ /* 店铺名称获取失败不影响主流程，静默忽略 */ }
+  }
+
+  // ----- 呼叫/催单实时通知 -----
+  let knownCallIds=new Set();
+  let callPollTimer=null;
+  let pendingCalls=[];
+  async function pollCalls(){
+    if(!state.token||document.hidden) return;
+    try{
+      const calls=await api('/waiter-calls');
+      pendingCalls=calls||[];
+      const btn=$('#callNotificationBtn');
+      const count=$('#callNotificationCount');
+      if(pendingCalls.length>0){
+        btn.style.display='inline-flex';
+        count.textContent=pendingCalls.length;
+        // 检测新呼叫
+        let hasNew=false;
+        for(const c of pendingCalls){ if(!knownCallIds.has(c.id)){ hasNew=true; break; } }
+        if(hasNew){
+          if(SLF.audio) SLF.audio.playCallChime();
+          const newCall=pendingCalls.find(c=>!knownCallIds.has(c.id));
+          if(newCall){
+            const typeText = newCall.type === 'urge' ? wt('urgeOrder') : wt('callWaiter');
+            toast(`🔔 ${newCall.table_name} ${typeText}`);
+          }
+        }
+        knownCallIds=new Set(pendingCalls.map(c=>c.id));
+      } else {
+        btn.style.display='none';
+        knownCallIds.clear();
+      }
+    }catch(e){ /* 静默失败 */ }
+  }
+  function startCallPolling(){
+    stopCallPolling();
+    callPollTimer=setInterval(pollCalls,5000);
+    pollCalls();
+  }
+  function stopCallPolling(){
+    if(callPollTimer) clearInterval(callPollTimer);
+    callPollTimer=null;
+  }
+  function showCallNotifications(){
+    if(pendingCalls.length===0){ toast(wt('noCalls')); return; }
+    const list=pendingCalls.map(c=>{
+      const typeText = c.type === 'urge' ? wt('urgeOrder') : wt('callWaiter');
+      return `<div style="background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.3);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div><div style="font-weight:700;">🔔 ${esc(c.table_name)} ${typeText}</div><div style="color:#999;font-size:12px;margin-top:2px;">${esc(c.created_at)||''}</div></div>
+        <button onclick="handleCall('${c.id}')" style="background:#27ae60;color:#fff;border:0;padding:6px 14px;border-radius:6px;cursor:pointer;">${wt('handled')}</button>
+      </div>`;
+    }).join('');
+    // 使用自定义模态框显示
+    const modal=document.createElement('div');
+    modal.className='modal';
+    modal.id='callNotifyModal';
+    modal.innerHTML=`<div class="modal-card" style="max-width:400px;">
+      <div class="modal-head"><h2>🔔 ${wt('callWaiter')}</h2><button class="modal-close" onclick="document.getElementById('callNotifyModal').remove()">✕</button></div>
+      <div class="modal-body">${list}</div>
+    </div>`;
+    modal.style.display='flex';
+    document.body.appendChild(modal);
+  }
+  async function handleCall(id){
+    try{
+      await api('/waiter-calls/'+id+'/handle',{method:'PUT'});
+      toast(wt('handled'));
+      const modal=document.getElementById('callNotifyModal');
+      if(modal) modal.remove();
+      pollCalls();
+    }catch(e){ toast(wt('handleFailed')+': '+e.message); }
+  }
+
+  // ----- 订单历史 -----
+  let historyOrders=[];
+  function showOrderHistory(){
+    document.getElementById('orderHistoryModal').style.display='flex';
+    document.getElementById('orderHistoryTitle').textContent='📋 '+wt('orderHistory');
+    // 更新状态筛选下拉选项
+    const statusSelect=document.getElementById('historyStatusFilter');
+    statusSelect.options[0].text=wt('allStatus');
+    statusSelect.options[1].text=wt('pending');
+    statusSelect.options[2].text=wt('completed');
+    statusSelect.options[3].text=wt('canceled');
+    loadOrderHistory();
+  }
+  function hideOrderHistory(){
+    document.getElementById('orderHistoryModal').style.display='none';
+  }
+  async function loadOrderHistory(){
+    try{
+      const statusFilter=document.getElementById('historyStatusFilter').value;
+      const dateFilter=document.getElementById('historyDateFilter').value;
+      let url='/orders';
+      const params=[];
+      if(statusFilter) params.push('status='+encodeURIComponent(statusFilter));
+      if(params.length>0) url+='?'+params.join('&');
+      const orders=await api(url);
+      historyOrders=orders||[];
+      // 按日期过滤
+      let filtered=historyOrders;
+      if(dateFilter){
+        filtered=historyOrders.filter(o=>{
+          const orderDate=new Date(o.createdAt).toISOString().split('T')[0];
+          return orderDate===dateFilter;
+        });
+      }
+      const container=document.getElementById('orderHistoryList');
+      if(filtered.length===0){
+        container.innerHTML='<div style="text-align:center;padding:40px;color:#999;">'+wt('noOrders')+'</div>';
+        return;
+      }
+      const statusMap={pending:wt('pending'),done:wt('completed'),canceled:wt('canceled')};
+      container.innerHTML=filtered.map(o=>`
+        <div onclick="showOrderDetail(${o.id})" style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="font-weight:700;font-size:15px;">#${o.id} ${wt('table')} ${esc(o.table)||'-'}</div>
+            <span style="background:${o.status==='done'?'#27ae60':o.status==='canceled'?'#95a5a6':'#f39c12'};color:#fff;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600;">${statusMap[o.status]||o.status}</span>
+          </div>
+          <div style="color:#666;font-size:13px;">${SLF.utils.formatDateTime(o.createdAt)}</div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;">
+            <span style="color:#888;font-size:13px;">${(o.items||[]).length} ${wt('dishes')}</span>
+            <span style="font-weight:700;color:#e74c3c;">$${(Number(o.total)||0).toFixed(2)}</span>
+          </div>
+        </div>
+      `).join('');
+    }catch(e){
+      document.getElementById('orderHistoryList').innerHTML='<div style="text-align:center;padding:20px;color:#e74c3c;">'+e.message+'</div>';
+    }
+  }
+  function showOrderDetail(id){
+    const order=historyOrders.find(o=>o.id===id);
+    if(!order) return;
+    const modal=document.getElementById('orderDetailModal');
+    const content=document.getElementById('orderDetailContent');
+    document.getElementById('orderDetailTitle').textContent=wt('order')+' #'+id;
+    const statusMap={pending:wt('pending'),done:wt('completed'),canceled:wt('canceled')};
+    content.innerHTML=`
+      <div style="margin-bottom:15px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span style="color:#666;">${wt('table')}</span>
+          <span style="font-weight:600;">${esc(order.table)||'-'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span style="color:#666;">${wt('status')}</span>
+          <span style="font-weight:600;">${statusMap[order.status]||order.status}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span style="color:#666;">${wt('orderTime')}</span>
+          <span>${SLF.utils.formatDateTime(order.createdAt)}</span>
+        </div>
+        ${order.note?`<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#666;">${wt('note')}</span><span>${esc(order.note)}</span></div>`:''}
+      </div>
+      <div style="border-top:1px solid #eee;padding-top:12px;margin-bottom:12px;">
+        <div style="font-weight:700;margin-bottom:10px;">${wt('dishes')}</div>
+        ${(order.items||[]).map((item,i)=>`
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+            <span>${esc(item.emoji)||'🍽️'} ${esc(item.name)} x${item.quantity}</span>
+            <span style="color:#e74c3c;">$${((Number(item.price)||0)*item.quantity).toFixed(2)}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div style="border-top:2px solid #333;padding-top:12px;display:flex;justify-content:space-between;font-size:18px;font-weight:700;">
+        <span>${wt('total')}</span>
+        <span style="color:#e74c3c;">$${(Number(order.total)||0).toFixed(2)}</span>
+      </div>
+    `;
+    modal.style.display='flex';
+  }
+  function hideOrderDetail(){
+    document.getElementById('orderDetailModal').style.display='none';
+  }
+
+  // ----- 自动刷新开关 -----
+  let waiterAutoRefreshTimer=null;
+  function startWaiterAutoRefresh(intervalSec){
+    stopWaiterAutoRefresh();
+    const secs = Math.max(3, parseInt(intervalSec, 10) || 8);
+    waiterAutoRefreshTimer=setInterval(()=>{ if(state.token && !document.hidden) load(); }, secs * 1000);
+  }
+  function stopWaiterAutoRefresh(){
+    if(waiterAutoRefreshTimer) clearInterval(waiterAutoRefreshTimer);
+    waiterAutoRefreshTimer=null;
+  }
+
+  function renderTables(){
+    $('#tableGrid').innerHTML=state.tables.map(t=>`<div class="table-card" onclick="openModal('${esc(t.name)}')"><div class="name">🍽️ ${esc(t.name)} <span class="status ${status(t)===wt('available')?'available':'occupied'}">${status(t)}</span></div><div class="bill">${bill(t)}</div></div>`).join('')||`<div style="color:#c8c8d0">${wt('noTables')}</div>`;
+    $('#submitBtn').style.display=state.waiter&&state.waiter.can_order?'block':'none';
+  }
+
+  // ----- 点餐弹窗 -----
+  function openModal(table){
+    state.currentTable=table;
+    const tableOrders=state.orders.filter(o=>o.table===table&&o.status==='pending');
+    // 多个订单时先弹出选择框
+    if(tableOrders.length>1){
+      showOrderSelect(tableOrders);
+      return;
+    }
+    openOrderEditor(table, tableOrders[0]||null);
+  }
+  // 打开订单编辑器（编辑指定订单或创建新订单）
+  function openOrderEditor(table, order){
+    state.cart={};state.cartMeta={};state.lockedItems=[];state.currentCategory='all';
+    state.editingOrderId=order?order.id:null;
+    if(order && order.items && order.items.length){
+      state.lockedItems=order.items.filter(i=>i.itemStatus==='done'||i.status==='done'||i.completed===true);
+      order.items.filter(i=>!(i.itemStatus==='done'||i.status==='done'||i.completed===true)).forEach(i=>{
+        const menuItem = state.menu.find(m=>(m.id==i.id||m.id===+i.id||m.name===i.name));
+        const itemId = menuItem ? menuItem.id : (i.id || i.name);
+        const qty = i.quantity || i.qty || 1;
+        state.cart[itemId]=(state.cart[itemId]||0)+qty;
+        state.cartMeta[itemId]=menuItem || i;
+      });
+    }
+    let tableLabel = wt('currentTable')+'：'+table;
+    if(order && order.sessionToken){
+      const tableOrders=state.orders.filter(o=>o.table===table&&o.status==='pending');
+      const labels=buildSessionLabels(tableOrders);
+      const customerLabel=labels.get(order.id);
+      if(customerLabel){
+        const customerColor = getCustomerColor(customerLabel);
+        tableLabel += ' <span class="session-badge" style="background:'+customerColor.bg+';color:'+customerColor.color+';">'+customerLabel+'</span>';
+      }
+    }
+    $('#currentTableBadge').innerHTML=tableLabel;
+    $('#submitBtn').textContent=order?wt('saveChanges'):wt('submitOrder');
+    renderDishes();
+    $('#orderModal').classList.add('open');
+  }
+  // 显示订单选择框
+  function showOrderSelect(tableOrders){
+    $('#orderSelectTitle').textContent=wt('currentTable')+'：'+state.currentTable+' - '+wt('selectOrder');
+    const labels=buildSessionLabels(tableOrders);
+    const listEl=$('#orderSelectList');
+    let html='';
+    tableOrders.forEach((order,idx)=>{
+      const customerLabel=labels.get(order.id)||(wt('order')+(idx+1));
+      const itemCount=order.items?order.items.length:0;
+      let total=0;
+      if(order.items){ order.items.forEach(i=>{ total += (i.price||0)*(i.quantity||1); }); }
+      const timeStr=order.created_at?new Date(order.created_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}):'';
+      html += '<div class="order-select-item" onclick="selectOrder('+order.id+')" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border:1px solid var(--gray-2);border-radius:10px;margin-bottom:10px;cursor:pointer;transition:all .2s;">';
+      html += '<div><div style="font-weight:600;font-size:15px;">'+customerLabel+'</div><div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">'+itemCount+' '+wt('dishes')+' · '+timeStr+'</div></div>';
+      html += '<div style="font-weight:700;color:var(--primary);">'+formatMoney(total)+'</div>';
+      html += '</div>';
+    });
+    listEl.innerHTML=html;
+    $('#orderSelectModal').classList.add('open');
+  }
+  // 选择订单进行编辑
+  function selectOrder(orderId){
+    const order=state.orders.find(o=>o.id===orderId);
+    if(!order) return;
+    closeOrderSelect();
+    openOrderEditor(state.currentTable, order);
+  }
+  // 从选择框创建新订单
+  function createNewOrderFromSelect(){
+    closeOrderSelect();
+    openOrderEditor(state.currentTable, null);
+  }
+  // 关闭订单选择框
+  function closeOrderSelect(){
+    $('#orderSelectModal').classList.remove('open');
+  }
+  function closeModal(){ $('#orderModal').classList.remove('open'); state.currentTable=null; state.cart={}; state.cartMeta={}; state.editingOrderId=null; state.lockedItems=[]; $('#submitBtn').textContent=wt('submitOrder'); }
+  function renderSelected(){
+    const items=Object.entries(state.cart).filter(([id,q])=>q>0).map(([id,q])=>{
+      // 容错：从 menu 或 cartMeta 中查找菜品
+      let m=state.menu.find(x=>(x.id==id||x.id===+id||x.name===id))||state.cartMeta[id];
+      if(!m){
+        // 尝试用 menu_id 或 name 查找
+        m=state.menu.find(x=>state.cartMeta[id]&&(x.id==state.cartMeta[id].id||x.name===state.cartMeta[id].name));
+      }
+      return m?{m,q,id}:null;
+    }).filter(Boolean);
+    // 未完成菜品（可编辑）
+    const cartHtml=items.length?items.map(x=>{
+      const prices=getMenuPrices(x.m);
+      let priceDisplay=prices.primary;
+      if(prices.secondary) priceDisplay += ' ('+prices.secondary+')';
+      const statusLabel = '<span class="item-status new">'+wt('newItem')+'</span>';
+      const itemId = x.m.id || x.id;
+      return '<div class="selected-item"><span class="sel-name">'+esc(x.m.name)+' '+statusLabel+'</span><span class="sel-price">'+priceDisplay+'</span><div class="qty"><button onclick="changeQty('+itemId+',-1)">−</button><span>'+x.q+'</span><button onclick="changeQty('+itemId+',1)">+</button></div><button class="remove-btn" onclick="removeItem('+itemId+')">'+wt('remove')+'</button></div>';
+    }).join(''):'';
+    // 已完成菜品（灰色只读）
+    let doneHtml='';
+    if(state.lockedItems.length){
+      doneHtml=state.lockedItems.map(i=>{
+        const prices=getMenuPrices(i);
+        let priceDisplay=prices.primary;
+        if(prices.secondary) priceDisplay += ' ('+prices.secondary+')';
+        return '<div class="selected-item" style="opacity:.55;pointer-events:none;"><span class="sel-name">'+esc(i.name)+' <span class="item-status done">'+wt('dishServed')+'</span></span><span class="sel-price">'+priceDisplay+'</span><div class="qty"><span>×'+(i.quantity||1)+'</span></div></div>';
+      }).join('');
+    }
+    // 如果都没有，显示空提示
+    const emptyHtml = (!items.length && !state.lockedItems.length) ? '<div style="color:#c8c8d0">'+wt('emptySelected')+'</div>' : '';
+    $('#selectedItems').innerHTML='<div class="title">'+wt('selectedDishes')+'</div>'+cartHtml+doneHtml+emptyHtml;
+  }
+  // 菜品分类名称翻译映射
+  const CATEGORY_TRANS={
+    zh:{'招牌烧腊':'招牌烧腊','烧腊饭':'烧腊饭','烧腊加料':'烧腊加料','饮料':'饮料','快餐':'快餐','卤菜':'卤菜','早茶':'早茶','面食':'面食','主食':'主食','小吃':'小吃','甜点':'甜点','汤类':'汤类','凉菜':'凉菜','热菜':'热菜'},
+    en:{'招牌烧腊':'Roast Meats','烧腊饭':'Rice Meals','烧腊加料':'Add-ons','饮料':'Drinks','快餐':'Fast Food','卤菜':'Braised','早茶':'Dim Sum','面食':'Noodles','主食':'Staples','小吃':'Snacks','甜点':'Desserts','汤类':'Soups','凉菜':'Cold Dishes','热菜':'Hot Dishes'},
+    vi:{'招牌烧腊':'Thịt nướng','烧腊饭':'Cơm','烧腊加料':'Thêm món','饮料':'Đồ uống','快餐':'Đồ ăn nhanh','卤菜':'Lẩu','早茶':'Trà sớm','面食':'Mì','主食':'Món chính','小吃':'Đồ ăn nhẹ','甜点':'Tráng miệng','汤类':'Canh','凉菜':'Món lạnh','热菜':'Món nóng'},
+    th:{'招牌烧腊':'เนื้อย่าง','烧腊饭':'ข้าว','烧腊加料':'เพิ่มเติม','饮料':'เครื่องดื่ม','快餐':'อาหารจานด่วน','卤菜':'ตุ๋น','早茶':'ติ่มซำ','面食':'ก๋วยเตี๋ยว','主食':'อาหารหลัก','小吃':'ของว่าง','甜点':'ของหวาน','汤类':'ซุป','凉菜':'อาหารเย็น','热菜':'อาหารร้อน'},
+    km:{'招牌烧腊':'សាច់អាំង','烧腊饭':'បាយ','烧腊加料':'បន្ថែម','饮料':'ភេសជ្ជៈ','快餐':'អាហាររហ័ស','卤菜':'ស្ងោរ','早茶':'តែព្រឹក','面食':'គុយទាវ','主食':'ម្ហូបចម្បង','小吃':'អាហារសម្រន់','甜点':'បង្អែម','汤类':'ស៊ុប','凉菜':'ម្ហូបត្រជាក់','热菜':'ម្ហូបក្តៅ'}
+  };
+  function transCategory(cat){
+    return (CATEGORY_TRANS[waiterLang]&&CATEGORY_TRANS[waiterLang][cat])||cat;
+  }
+  function renderCategories(){
+    const categories=['all', ...new Set(state.menu.map(m=>m.category).filter(Boolean))];
+    const catHtml=categories.map(cat=>{
+      const label = cat==='all' ? wt('allCategories') : transCategory(cat);
+      const active = state.currentCategory===cat ? 'active' : '';
+      return `<button class="cat-btn ${active}" onclick="setDishCategory('${cat}')">${label}</button>`;
+    }).join('');
+    $('#dishCategories').innerHTML=catHtml;
+  }
+  function setDishCategory(cat){
+    state.currentCategory=cat;
+    renderDishes();
+  }
+  function renderDishes(){
+    renderCategories();
+    // 按照销量自动排序，热销菜品排在最前面
+    let sortedMenu=[...state.menu].sort((a,b)=>(Number(b.sales_count)||0)-(Number(a.sales_count)||0));
+    // 按分类筛选
+    if(state.currentCategory!=='all'){
+      sortedMenu=sortedMenu.filter(m=>m.category===state.currentCategory);
+    }
+    $('#dishList').innerHTML=sortedMenu.map(m=>{
+      const locked=state.lockedItems.find(i=>i.id===m.id);
+      const cartQty=state.cart[m.id]||0;
+      const prices=getMenuPrices(m);
+      let priceDisplay=prices.primary;
+      if(prices.secondary) priceDisplay += ` <span class="price-secondary">(${prices.secondary})</span>`;
+      let qtyHtml;
+      if(locked){
+        // 已完成菜品：只显示新下单数量（可加减），不显示已完成标签
+        qtyHtml=`<button onclick="changeQty(${m.id},-1)">−</button><span>${cartQty}</span><button onclick="changeQty(${m.id},1)">+</button>`;
+      } else {
+        qtyHtml=`<button onclick="changeQty(${m.id},-1)">−</button><span>${cartQty}</span><button onclick="changeQty(${m.id},1)">+</button>`;
+      }
+      return `<div class="dish-item"><div class="dish-thumb">${m.image?`<img src="/uploads/${esc(m.image)}" alt="${esc(m.name)}">`:esc(m.emoji)||'🍽️'}</div><div class="info"><div class="name">${esc(m.name)}</div><div class="price">${priceDisplay}/${esc(m.unit)||wt('unit')}</div></div>${qtyHtml}</div>`;
+    }).join('');
+    renderSelected();
+    updateTotal();
+  }
+  function changeQty(id,delta){ state.cart[id]=(state.cart[id]||0)+delta; if(state.cart[id]<=0) delete state.cart[id]; renderDishes(); }
+  function removeItem(id){ delete state.cart[id]; delete state.cartMeta[id]; renderDishes(); }
+  function updateTotal(){
+    let totalBase=0;
+    for(const [id,q] of Object.entries(state.cart)){
+      const m=state.menu.find(x=>x.id===+id)||state.cartMeta[id];
+      if(m) totalBase += toBaseCurrency(m.price, m.currency_code) * q;
+    }
+    for(const i of state.lockedItems){
+      totalBase += toBaseCurrency(i.price, i.currency_code) * i.quantity;
+    }
+    $('#orderTotal').textContent=formatMoney(totalBase);
+  }
+  $('#submitBtn').onclick=async function(){
+    if(!state.currentTable){ toast(wt('noTables')); return; }
+    showConfirm(wt('confirmSubmit'),async function(){
+    const cartItems=Object.entries(state.cart).filter(([id,q])=>q>0).map(([id,q])=>{
+      const m=state.menu.find(x=>x.id===+id);
+      return {id:m.id,name:m.name,price:m.price,quantity:q,emoji:m.emoji,itemStatus:'pending',show_dual:m.show_dual||0,secondary_currency_code:m.secondary_currency_code||'',unit:m.unit||wt('unit')};
+    });
+    const lockedItems=state.lockedItems.map(i=>({id:i.id,name:i.name,price:i.price,quantity:i.quantity,emoji:i.emoji,itemStatus:'done',show_dual:i.show_dual||0,secondary_currency_code:i.secondary_currency_code||'',unit:i.unit||wt('unit')}));
+    const items=[...lockedItems,...cartItems];
+    if(!items.length){ toast(wt('selectDish')); return; }
+    try{
+      if(state.editingOrderId){
+        await api('/orders/'+state.editingOrderId, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({items}) });
+        toast('✅ '+wt('orderUpdated'));
+      }else{
+        const res=await api('/orders', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table:state.currentTable, items}) });
+        toast(`✅ ${state.currentTable} ${wt('orderSubmitted')} #${res.orderId}`);
+      }
+      closeModal();
+      await load();
+    }catch(e){ toast('❌ '+e.message); }
+    });
+  };
+
+  // ----- 语言切换 -----
+  async function setLanguage(lang) {
+    waiterLang = lang;
+    localStorage.setItem('waiterLang', lang);
+    document.getElementById('waiterLang').value = lang;
+    // 先加载共享翻译数据（available/occupied/noCustomerOrder等存在LANGUAGES中）
+    await loadWaiterLanguage(lang);
+    if (state.token) {
+      applyWaiterLanguage();
+    }
+  }
+  // 动态加载语言
+  async function loadWaiterLanguage(lang) {
+    if (typeof LANGUAGES !== 'undefined' && LANGUAGES[lang] && LANGUAGES[lang]._loaded) return true;
+    try {
+      const cached = localStorage.getItem('i18n_' + lang);
+      if (cached) { LANGUAGES[lang] = { ...JSON.parse(cached), _loaded: true }; return true; }
+    } catch (e) {}
+    try {
+      const res = await fetch('/api/i18n/' + lang);
+      if (res.ok) {
+        const data = await res.json();
+        LANGUAGES[lang] = { ...data, _loaded: true };
+        try { localStorage.setItem('i18n_' + lang, JSON.stringify(data)); } catch (e) {}
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+  document.getElementById('waiterLang').addEventListener('change', async function() {
+    await setLanguage(this.value);
+  });
+  // ----- 初始化语言 -----
+  // 从 localStorage 读取，如果无则默认 zh
+  const savedLang = localStorage.getItem('waiterLang') || 'zh';
+  waiterLang = savedLang;
+  // 预加载当前语言的共享翻译数据
+  loadWaiterLanguage(savedLang);
+
+  // 启动：检查登录状态，未登录跳转到统一登录页
+  if(state.token){
+    $('#mainHeader').style.display='flex';
+    $('#mainContent').style.display='block';
+    applyWaiterLanguage();
+    load().then(()=>{startCallPolling();}).catch(()=>logoutWaiter());
+  }else{
+    window.location.href = '/login?type=waiter';
+  }
+</script>
+</body>
+</html>
+

@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.5">
+<title>Kitchen Display</title>
+<link rel="stylesheet" href="assets/common.css">
+<script>
+  // 页面渲染前立即检查登录状态，避免登录框闪现
+  (function() {
+    try {
+      if (localStorage.getItem('kitchenToken')) {
+        document.documentElement.setAttribute('data-authed', 'true');
+      }
+    } catch(e) {}
+  })();
+</script>
+<style>
+  /* 已登录状态：隐藏登录框，显示主应用 */
+  html[data-authed="true"] .login-wrap { display: none !important; }
+  html[data-authed="true"] .kitchen-app { display: flex !important; }
+  :root {
+    --bg: #14151f;
+    --panel: #1c1e2b;
+    --panel-2: #232538;
+    --border: rgba(255,255,255,.08);
+    --text: #f0f1f5;
+    --text-dim: #9598ab;
+    --primary: #ff7a45;
+    --primary-2: #ffb020;
+    --ok: #2ecc71;
+    --warn: #ffb020;
+    --danger: #ff5f5f;
+    --radius: 16px;
+  }
+  body {
+    margin: 0; min-height: 100vh;
+    background: radial-gradient(circle at 10% 0%, rgba(255,122,69,.10), transparent 40%),
+      radial-gradient(circle at 90% 10%, rgba(120,110,255,.10), transparent 40%), var(--bg);
+    color: var(--text);
+    font: 15px -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+  }
+  /* 登录界面 */
+  .login-wrap {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .login-box {
+    width: 100%; max-width: 420px; padding: 34px;
+    border: 1px solid var(--border); border-radius: 24px;
+    background: linear-gradient(165deg, var(--panel-2), var(--panel));
+    box-shadow: 0 26px 60px rgba(0,0,0,.4); text-align: center;
+  }
+  .login-box h1 { margin: 0 0 6px; font-size: 22px; }
+  .login-box .desc { color: var(--text-dim); font-size: 13px; margin: 0 0 20px; line-height: 1.6; }
+  .login-box input {
+    width: 100%; height: 48px; margin-bottom: 12px; padding: 0 14px;
+    border-radius: 12px; border: 1px solid var(--border);
+    background: #20223a; color: #fff; font-size: 15px; outline: none;
+  }
+  .login-box input:focus { border-color: var(--primary); }
+  .login-box button {
+    width: 100%; height: 48px; border: 0; border-radius: 12px;
+    background: linear-gradient(135deg, #ff8a5c, var(--primary));
+    color: #fff; font-weight: 800; font-size: 16px; cursor: pointer;
+  }
+  .login-box .error { min-height: 20px; margin-top: 12px; color: #ff9c9c; font-size: 13px; }
+  .lang-bar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+  .lang-bar select {
+    height: 34px; padding: 0 8px; border-radius: 8px;
+    border: 1px solid var(--border); background: rgba(255,255,255,.08); color: #fff; cursor: pointer;
+  }
+  .lang-bar select option { background: #2d2d44; color: #fff; }
+  /* 主显示界面 */
+  .kitchen-app { display: none; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
+  .kitchen-app.show { display: flex; }
+  .login-wrap.hide { display: none; }
+  .top-bar {
+    display: flex; align-items: center; gap: 14px; padding: 14px 20px;
+    border-bottom: 1px solid var(--border); background: rgba(0,0,0,.2); flex-wrap: wrap;
+  }
+  .top-bar h1 { font-size: 20px; margin: 0; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .top-bar .spacer { flex: 1; }
+  .top-bar .status-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--ok);
+    display: inline-block; margin-right: 6px; box-shadow: 0 0 8px var(--ok);
+  }
+  .top-bar .status-dot.off { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  .top-bar .count-badge {
+    background: var(--primary); color: #fff; border-radius: 999px;
+    padding: 4px 14px; font-weight: 700; font-size: 14px;
+  }
+  .top-bar .updated { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+  .top-bar button, .top-bar select {
+    height: 36px; padding: 0 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: rgba(255,255,255,.06);
+    color: var(--text); font-size: 13px; cursor: pointer;
+  }
+  .top-bar button:hover { background: rgba(255,255,255,.12); }
+  .top-bar select option { background: #2d2d44; color: #fff; }
+  .ticket-grid {
+    flex: 1; padding: 18px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px; align-content: start;
+  }
+  .empty-state { grid-column: 1/-1; text-align: center; padding: 80px 20px; color: var(--text-dim); font-size: 18px; }
+  .ticket {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; display: flex; flex-direction: column; gap: 10px; border-left: 5px solid var(--primary);
+  }
+  .ticket.warn { border-left-color: var(--warn); }
+  .ticket.danger { border-left-color: var(--danger); animation: pulseBorder 1.6s infinite; }
+  .ticket.ready { border-left-color: var(--ok); }
+  @keyframes pulseBorder {
+    0%,100% { box-shadow: 0 0 0 rgba(255,95,95,0); }
+    50% { box-shadow: 0 0 0 4px rgba(255,95,95,.15); }
+  }
+  .ticket-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .ticket-head .table-name { font-size: 22px; font-weight: 800; }
+  .ticket-head .order-id {
+    font-size: 26px; font-weight: 900; letter-spacing: .3px;
+    padding: 6px 16px; border-radius: 10px; background: rgba(255,255,255,.1);
+    color: var(--text); white-space: nowrap;
+  }
+  .ticket-head .order-id.warn { background: rgba(255,176,32,.18); color: var(--warn); }
+  .ticket-head .order-id.danger { background: rgba(255,95,95,.18); color: var(--danger); }
+  .ticket-head .order-id.ready { background: rgba(46,204,113,.18); color: var(--ok); }
+  .ticket-time { font-size: 13px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+  .ticket-time.warn { color: var(--warn); }
+  .ticket-time.danger { color: var(--danger); font-weight: 700; }
+  .ticket-note {
+    background: rgba(255,176,32,.14); color: var(--primary-2);
+    border-radius: 10px; padding: 8px 10px; font-size: 14px; line-height: 1.5;
+  }
+  .ticket-items { display: flex; flex-direction: column; gap: 8px; }
+  .item-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    border-radius: 10px; background: rgba(255,255,255,.04);
+  }
+  .item-row.done { opacity: .45; }
+  .item-row .qty { font-size: 20px; font-weight: 800; color: var(--primary-2); min-width: 34px; text-align: center; }
+  .item-row .emoji { font-size: 22px; }
+  .item-row .name { flex: 1; font-size: 18px; font-weight: 600; }
+  .item-row .unit { color: var(--text-dim); font-size: 13px; }
+  .item-row .done-badge { color: var(--ok); font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .item-row button.mark-btn {
+    border: 0; border-radius: 8px; background: var(--primary); color: #fff;
+    font-size: 13px; font-weight: 700; padding: 8px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .item-row button.mark-btn:hover { filter: brightness(1.1); }
+  .ticket-ready-tag {
+    align-self: flex-start; background: rgba(46,204,113,.16); color: var(--ok);
+    font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px;
+  }
+  .ticket-actions {
+    display: flex; gap: 8px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .ticket-actions button {
+    flex: 1; padding: 8px 0; border: 0; border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .2s;
+  }
+  .ticket-actions button:hover { opacity: .85; }
+  .print-btn { background: rgba(52,152,219,.2); color: #5dade2; }
+  .complete-btn { background: rgba(46,204,113,.2); color: var(--ok); }
+  .toast {
+    position: fixed; left: 50%; top: auto; bottom: 32px; transform: translateX(-50%) translateY(20px);
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: #fff; padding: 12px 24px;
+    border-radius: 12px; font-size: 14px; font-weight: 600;
+    z-index: 9999; opacity: 0;
+    pointer-events: none; transition: all .3s ease;
+    box-shadow: 0 8px 30px rgba(0,0,0,.3);
+    max-width: 80%; width: auto; height: auto;
+    text-align: center; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { background: linear-gradient(135deg, #00b09b, #96c93d); }
+  .toast.error { background: linear-gradient(135deg, #eb3349, #f45c43); }
+  .toast.warning { background: linear-gradient(135deg, #f7971e, #ffd200); color: #333; }
+  @media (max-width:520px) {
+    .ticket-grid { grid-template-columns: 1fr; padding: 12px; }
+    .top-bar { padding: 10px 12px; }
+    .top-bar h1 { font-size: 17px; }
+  }
+
+  /* ===== 确认模态框 ===== */
+  .modal{
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 16px;
+  }
+  .modal.open{ display: flex; }
+  .modal-card{
+    background: #fff;
+    border-radius: 16px;
+    max-width: 920px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    padding: 24px;
+  }
+  .confirm-modal .confirm-card{
+    max-width: 360px;
+    padding: 24px 24px 20px;
+    text-align: center;
+    border-radius: 16px;
+  }
+  .confirm-icon{ font-size: 40px; margin-bottom: 12px; }
+  .confirm-title{ font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
+  .confirm-message{ font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 18px; }
+  .confirm-buttons{ display: flex; gap: 10px; justify-content: center; }
+  .confirm-cancel, .confirm-ok{
+    flex: 1; padding: 10px 20px; border: 0; border-radius: 10px;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+  }
+  .confirm-cancel{ background: #f0f0f5; color: #666; }
+  .confirm-cancel:hover{ background: #e4e4ec; }
+  .confirm-ok{ background: linear-gradient(135deg, #e85d3a, #e84a2a); color: #fff; }
+  .confirm-ok:hover{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(232,93,58,0.3); }
+  .urge-modal .urge-card{
+    max-width: 400px;
+    padding: 0;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .urge-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: #fff;
+  }
+  .urge-title{ font-size: 15px; font-weight: 700; }
+  .urge-close{
+    background: rgba(255,255,255,.2);
+    border: 0;
+    color: #fff;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s;
+  }
+  .urge-close:hover{ background: rgba(255,255,255,.3); }
+  .urge-list{
+    padding: 12px;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .urge-item{
+    background: rgba(231,76,60,.08);
+    border: 1px solid rgba(231,76,60,.2);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .urge-item:last-child{ margin-bottom: 0; }
+  .urge-item-info{ flex: 1; min-width: 0; }
+  .urge-item-table{ font-weight: 700; color: #1a1a2e; font-size: 14px; }
+  .urge-item-msg{ color: #888; font-size: 11px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .urge-item-btn{
+    background: #27ae60;
+    color: #fff;
+    border: 0;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all .2s;
+  }
+  .urge-item-btn:hover{ background: #219a52; transform: translateY(-1px); }
+</style>
+</head>
+<body>
+
+  <div class="login-wrap" id="loginWrap">
+    <div class="login-box">
+      <div class="lang-bar">
+        <select id="langSelect">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+          <option value="vi">Tiếng Việt</option>
+          <option value="th">ภาษาไทย</option>
+          <option value="km">ភាសាខ្មែរ</option>
+        </select>
+      </div>
+      <h1 id="loginTitle">后厨登录</h1>
+      <p class="desc" id="loginDesc">请使用服务员账号登录后厨显示屏</p>
+      <input id="username" type="text" autocomplete="username">
+      <input id="password" type="password" autocomplete="current-password">
+      <button id="loginBtn">登录</button>
+      <div class="error" id="loginError"></div>
+    </div>
+  </div>
+
+  <div class="kitchen-app" id="kitchenApp">
+    <div class="top-bar">
+      <h1>🍳 <span id="pageTitle">后厨订单显示</span></h1>
+      <span class="count-badge" id="countBadge">0</span>
+      <button class="urge-notification-btn" id="urgeNotificationBtn" onclick="showUrgeNotifications()" style="display:none;background:#e74c3c;color:#fff;border:0;padding:6px 14px;border-radius:20px;cursor:pointer;font-weight:600;font-size:13px;margin-left:10px;">
+        ⚡ <span id="urgeNotificationCount">0</span>
+      </button>
+      <span id="kitchenStoreName" style="background:rgba(255,255,255,.15);padding:4px 12px;border-radius:12px;font-size:13px;margin-left:10px;display:none;"></span>
+      <div class="spacer"></div>
+      <span class="updated"><span class="status-dot" id="statusDot"></span><span id="updatedLabel">更新于</span> <span id="updatedTime">--:--:--</span></span>
+      <select id="langSelectMain">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+        <option value="vi">Tiếng Việt</option>
+        <option value="th">ภาษาไทย</option>
+        <option value="km">ភាសាខ្មែរ</option>
+      </select>
+      <button id="fullscreenBtn">⛶ <span id="fullscreenLabel">全屏</span></button>
+      <button id="logoutBtn">🚪 <span id="logoutLabel">退出登录</span></button>
+    </div>
+    <div class="ticket-grid" id="ticketGrid"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- ===== 确认模态框 ===== -->
+  <div class="modal confirm-modal" id="confirmModal">
+    <div class="modal-card confirm-card">
+      <div class="confirm-icon">⚠️</div>
+      <div class="confirm-title" id="confirmTitle">确认操作</div>
+      <div class="confirm-message" id="confirmMessage">确定要执行此操作吗？</div>
+      <div class="confirm-buttons">
+        <button class="confirm-cancel" id="confirmCancelBtn">取消</button>
+        <button class="confirm-ok" id="confirmOkBtn">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 催单通知模态框 ===== -->
+  <div class="modal urge-modal" id="urgeModal">
+    <div class="modal-card urge-card">
+      <div class="urge-header">
+        <div class="urge-title">⚡ <span id="urgeModalTitle">催单通知</span></div>
+        <button class="urge-close" onclick="hideUrgeModal()">✕</button>
+      </div>
+      <div class="urge-list" id="urgeList"></div>
+    </div>
+  </div>
+
+  <script src="languages.min.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+    const $ = s => document.querySelector(s);
+    // 安全兜底：兼容旧版 common.js 没有 SLF.audio 的情况
+    const audio = SLF.audio || { unlock: () => {}, setEnabled: () => {}, playNewOrderChime: () => {}, playUrgeChime: () => {} };
+    let lang = localStorage.getItem('kitchenLang') || 'zh';
+    // 预加载非中文语言数据，确保初始化时字典完整
+    if (lang !== 'zh') {
+      loadKitchenLanguage(lang).then(() => {
+        SLF.i18n.init(lang);
+        applyLoginLanguage();
+        applyMainLanguage();
+      });
+    }
+    SLF.i18n.init(lang);
+    const kt = k => SLF.i18n.t(k);
+
+    let token = localStorage.getItem('kitchenToken') || '';
+    let waiter = null;
+    let pollTimer = null;
+    let clockTimer = null;
+    let knownOrderIds = null;
+
+    // 新订单提示音
+    // 催单提示音（急促的四声）
+    async function loadSoundSetting() {
+      try {
+        const res = await fetch('/api/public/config');
+        const data = await res.json();
+        if (typeof data.newOrderSoundEnabled === 'boolean') audio.setEnabled(data.newOrderSoundEnabled);
+      } catch (e) {}
+    }
+    function detectNewOrders(orders) {
+      const pendingIds = new Set((orders || []).filter(o => o.status === 'pending').map(o => o.id));
+      if (knownOrderIds !== null) {
+        const newOrders = [];
+        for (const o of (orders || [])) {
+          if (o.status === 'pending' && !knownOrderIds.has(o.id)) newOrders.push(o);
+        }
+        if (newOrders.length > 0) {
+          audio.playNewOrderChime();
+          // 视觉提醒：Toast提示新订单
+          const tableNames = newOrders.map(o => o.table_name).join('、');
+          showToast('🔔 ' + kt('newOrderArrived') + '：' + tableNames, 'success', 4000);
+        }
+      }
+      knownOrderIds = pendingIds;
+    }
+
+    function showToast(msg, type = '', ms = 2500) {
+      const el = $('#toast');
+      el.textContent = msg;
+      el.className = 'toast';
+      if (type) el.classList.add(type);
+      el.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => el.classList.remove('show'), ms);
+    }
+
+    async function api(path, opt = {}) {
+      const headers = new Headers(opt.headers || {});
+      if (token) headers.set('X-Waiter-Token', token);
+      const res = await fetch('/api' + path, { ...opt, headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || kt('networkError'));
+      return data;
+    }
+
+    function applyLoginLanguage() {
+      $('#loginTitle').textContent = kt('kitchenLogin');
+      $('#loginDesc').textContent = kt('kitchenLoginDesc');
+      $('#username').placeholder = kt('username');
+      $('#password').placeholder = kt('password');
+      $('#loginBtn').textContent = kt('login');
+      $('#langSelect').value = lang;
+    }
+
+    function applyMainLanguage() {
+      $('#pageTitle').textContent = kt('kitchenDisplay');
+      $('#updatedLabel').textContent = kt('updatedAt');
+      $('#fullscreenLabel').textContent = document.fullscreenElement ? kt('exitFullscreen') : kt('fullscreen');
+      $('#logoutLabel').textContent = kt('logout');
+      $('#langSelectMain').value = lang;
+    }
+
+    async function loadKitchenLanguage(lang) {
+      if (LANGUAGES[lang] && LANGUAGES[lang]._loaded) return true;
+      try {
+        const cached = localStorage.getItem('i18n_' + lang);
+        if (cached) { LANGUAGES[lang] = { ...JSON.parse(cached), _loaded: true }; return true; }
+      } catch (e) {}
+      try {
+        const res = await fetch('/api/i18n/' + lang);
+        if (res.ok) {
+          const data = await res.json();
+          LANGUAGES[lang] = { ...data, _loaded: true };
+          try { localStorage.setItem('i18n_' + lang, JSON.stringify(data)); } catch (e) {}
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+    async function setLang(next) {
+      lang = next;
+      if (lang !== 'zh') await loadKitchenLanguage(lang);
+      localStorage.setItem('kitchenLang', lang);
+      // 重新初始化i18n，将新加载的LANGUAGES字典合并到SLF.i18n.dicts中
+      SLF.i18n.init(lang);
+      applyLoginLanguage();
+      applyMainLanguage();
+      renderTickets(lastOrders);
+    }
+    $('#langSelect').addEventListener('change', e => setLang(e.target.value));
+    $('#langSelectMain').addEventListener('change', e => setLang(e.target.value));
+
+    function timeAgoLabel(createdAt) {
+      const mins = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000));
+      if (mins < 1) return { text: kt('justNow'), level: 'ok' };
+      const text = `${mins} ${kt('minutesAgo')}`;
+      if (mins >= 15) return { text, level: 'danger' };
+      if (mins >= 8) return { text, level: 'warn' };
+      return { text, level: 'ok' };
+    }
+
+    let lastOrders = [];
+
+    function renderTickets(orders) {
+      lastOrders = orders || [];
+      const grid = $('#ticketGrid');
+      const pending = lastOrders
+        .filter(o => o.status === 'pending')
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+      $('#countBadge').textContent = pending.length;
+
+      if (pending.length === 0) {
+        grid.innerHTML = `<div class="empty-state" id="emptyState">${kt('noPendingOrders')}</div>`;
+        return;
+      }
+
+      grid.innerHTML = pending.map(o => {
+        const time = timeAgoLabel(o.createdAt);
+        const allDone = o.items.length > 0 && o.items.every(it => it.itemStatus === 'done');
+        const ticketClass = allDone ? 'ready' : (time.level === 'danger' ? 'danger' : (time.level === 'warn' ? 'warn' : ''));
+        const timeClass = time.level === 'danger' ? 'danger' : (time.level === 'warn' ? 'warn' : '');
+
+        const itemsHtml = o.items.map((item, idx) => {
+          const isDone = item.itemStatus === 'done';
+          const canMark = waiter && waiter.can_mark_item;
+          let action = '';
+          if (isDone) {
+            action = `<span class="done-badge">✓ ${kt('itemDone')}</span>`;
+          } else if (canMark) {
+            action = `<button class="mark-btn" onclick="markItemDone(${o.id},${idx})">${kt('markDone')}</button>`;
+          }
+          return `
+            <div class="item-row ${isDone ? 'done' : ''}">
+              <span class="qty">×${item.quantity}</span>
+              <span class="emoji">${SLF.utils.esc(item.emoji || '🍽️')}</span>
+              <span class="name">${SLF.utils.esc(item.name)}</span>
+              <span class="unit">${SLF.utils.esc(item.unit || '')}</span>
+              ${action}
+            </div>`;
+        }).join('');
+
+        const noteHtml = o.note ? `<div class="ticket-note"><strong>${kt('orderNoteDisplay')}：</strong>${SLF.utils.esc(o.note)}</div>` : '';
+        const readyTag = allDone ? `<div class="ticket-ready-tag">✅ ${kt('readyToServe')}</div>` : '';
+
+        return `
+          <div class="ticket ${ticketClass}">
+            <div class="ticket-head">
+              <span class="table-name">🪑 ${SLF.utils.esc(o.table)}</span>
+              <span class="order-id ${ticketClass}">#${o.id}</span>
+            </div>
+            <div class="ticket-time ${timeClass}">🕒 ${time.text}</div>
+            ${noteHtml}
+            <div class="ticket-items">${itemsHtml}</div>
+            ${readyTag}
+          </div>`;
+      }).join('');
+    }
+
+    window.markItemDone = async function(orderId, index) {
+      try {
+        await api(`/orders/${orderId}/items/${index}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemStatus: 'done' })
+        });
+        await loadOrders();
+      } catch (e) {
+        showToast('❌ ' + (e.message || kt('networkError')), 'error');
+      }
+    };
+
+
+
+    async function loadOrders() {
+      try {
+        const data = await api('/waiter/overview');
+        waiter = data.waiter;
+        // 显示所属店铺名称
+        const storeNameEl = document.getElementById('kitchenStoreName');
+        if (storeNameEl && data.storeName) {
+          storeNameEl.textContent = '🏪 ' + data.storeName;
+          storeNameEl.style.display = 'inline-block';
+        }
+        detectNewOrders(data.orders || []);
+        renderTickets(data.orders || []);
+        $('#statusDot').classList.remove('off');
+        $('#updatedTime').textContent = SLF.utils.formatTime(new Date());
+      } catch (e) {
+        $('#statusDot').classList.add('off');
+        if (/请先登录|无操作权限|401/.test(e.message || '')) {
+          logout(false);
+        } else {
+          showToast('❌ ' + (e.message || kt('networkError')), 'error');
+        }
+      }
+    }
+
+    // ----- 催单实时通知 -----
+    let knownUrgeIds = new Set();
+    let urgePollTimer = null;
+    let pendingUrges = [];
+    async function pollUrges() {
+      if (document.hidden) return;
+      try {
+        const res = await fetch('/api/waiter-calls', { headers: { 'X-Waiter-Token': token } });
+        if (!res.ok) return;
+        const calls = await res.json();
+        pendingUrges = (calls || []).filter(c => c.type === 'urge');
+        const btn = document.getElementById('urgeNotificationBtn');
+        const count = document.getElementById('urgeNotificationCount');
+        if (pendingUrges.length > 0) {
+          btn.style.display = 'inline-flex';
+          count.textContent = pendingUrges.length;
+          let hasNew = false;
+          for (const c of pendingUrges) { if (!knownUrgeIds.has(c.id)) { hasNew = true; break; } }
+          if (hasNew) {
+            audio.playUrgeChime();
+            const newUrge = pendingUrges.find(c => !knownUrgeIds.has(c.id));
+            if (newUrge) showToast('⚡ ' + newUrge.table_name + ' ' + kt('urgeOrder'));
+          }
+          knownUrgeIds = new Set(pendingUrges.map(c => c.id));
+        } else {
+          btn.style.display = 'none';
+          knownUrgeIds.clear();
+        }
+      } catch (e) { /* 静默失败 */ }
+    }
+    function startUrgePolling() {
+      stopUrgePolling();
+      urgePollTimer = setInterval(pollUrges, 5000);
+      pollUrges();
+    }
+    function stopUrgePolling() {
+      if (urgePollTimer) clearInterval(urgePollTimer);
+      urgePollTimer = null;
+    }
+    function showUrgeNotifications() {
+      if (pendingUrges.length === 0) { showToast(kt('noUrges')); return; }
+      $('#urgeModalTitle').textContent = kt('urgeOrder') + ' (' + pendingUrges.length + ')';
+      const list = pendingUrges.map(c => `
+        <div class="urge-item">
+          <div class="urge-item-info">
+            <div class="urge-item-table">⚡ ${SLF.utils.esc(c.table_name)} ${kt('urgeOrder')}</div>
+            <div class="urge-item-msg">${c.message || ''}</div>
+          </div>
+          <button class="urge-item-btn" onclick="handleUrge('${c.id}')">${kt('handled')}</button>
+        </div>
+      `).join('');
+      $('#urgeList').innerHTML = list;
+      $('#urgeModal').classList.add('open');
+    }
+    function hideUrgeModal(){ $('#urgeModal').classList.remove('open'); }
+    $('#urgeModal').onclick=function(e){if(e.target===this)hideUrgeModal();};
+    async function handleUrge(id) {
+      try {
+        await fetch('/api/waiter-calls/' + id + '/handle', { method: 'PUT', headers: { 'X-Waiter-Token': token } });
+        hideUrgeModal();
+        showToast(kt('handled'), 'success');
+        pollUrges();
+      } catch (e) { showToast(kt('handleFailed') + ': ' + e.message, 'error'); }
+    }
+
+    function startPolling() {
+      stopPolling();
+      knownOrderIds = null;
+      loadSoundSetting();
+      loadOrders();
+      pollTimer = setInterval(loadOrders, 4000);
+      clockTimer = setInterval(() => { renderTickets(lastOrders); loadSoundSetting(); }, 30000);
+      startUrgePolling();
+    }
+    function stopPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      if (clockTimer) clearInterval(clockTimer);
+      pollTimer = null; clockTimer = null;
+      stopUrgePolling();
+    }
+
+    function showKitchenApp() {
+      $('#loginWrap').classList.add('hide');
+      $('#kitchenApp').classList.add('show');
+      applyMainLanguage();
+      startPolling();
+    }
+
+    function showLoginScreen() {
+      $('#kitchenApp').classList.remove('show');
+      $('#loginWrap').classList.remove('hide');
+      applyLoginLanguage();
+      stopPolling();
+    }
+
+    async function doLogin() {
+      audio.unlock();
+      const username = $('#username').value.trim();
+      const password = $('#password').value.trim();
+      if (!username || !password) { $('#loginError').textContent = kt('pleaseLogin'); return; }
+      try {
+        const data = await SLF.api.post('/waiter/login', { username, password });
+        token = data.token;
+        waiter = data.waiter;
+        localStorage.setItem('kitchenToken', token);
+        $('#loginError').textContent = '';
+        showKitchenApp();
+      } catch (e) {
+        $('#loginError').textContent = e.message || kt('loginError');
+      }
+    }
+    $('#loginBtn').addEventListener('click', doLogin);
+    $('#password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    $('#username').addEventListener('keydown', e => { if (e.key === 'Enter') $('#password').focus(); });
+
+    let confirmCallback=null;
+    function showConfirm(message,callback,title,icon){
+      $('#confirmTitle').textContent=title||kt('confirmTitle')||'确认操作';
+      $('#confirmMessage').textContent=message;
+      $('.confirm-icon').textContent=icon||'⚠️';
+      confirmCallback=callback;
+      $('#confirmModal').classList.add('open');
+      // 更新按钮文本
+      $('#confirmCancelBtn').textContent=kt('cancel')||'取消';
+      $('#confirmOkBtn').textContent=kt('confirm')||'确定';
+    }
+    function hideConfirm(){$('#confirmModal').classList.remove('open');confirmCallback=null;}
+    $('#confirmCancelBtn').onclick=hideConfirm;
+    $('#confirmOkBtn').onclick=function(){if(confirmCallback)confirmCallback();hideConfirm();};
+    $('#confirmModal').onclick=function(e){if(e.target===this)hideConfirm();};
+
+    function logout(confirmFirst = true) {
+      if (confirmFirst) { showConfirm(kt('confirmLogout'), function(){ logout(false); }); return; }
+      token = '';
+      waiter = null;
+      localStorage.removeItem('kitchenToken');
+      showLoginScreen();
+    }
+    $('#logoutBtn').addEventListener('click', () => logout(true));
+
+    $('#fullscreenBtn').addEventListener('click', () => {
+      audio.unlock();
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    });
+    document.addEventListener('fullscreenchange', () => {
+      $('#fullscreenLabel').textContent = document.fullscreenElement ? kt('exitFullscreen') : kt('fullscreen');
+    });
+
+    // 音频解锁：任何用户交互都解锁音频上下文
+    ['click', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+      document.addEventListener(evt, () => audio.unlock(), { passive: true });
+    });
+
+    // 初始化
+    applyLoginLanguage();
+    applyMainLanguage();
+    if (token) {
+      showKitchenApp();
+    } else {
+      showLoginScreen();
+    }
+  </script>
+</body>
+</html>

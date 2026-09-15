@@ -1,0 +1,41 @@
+# ============================================================
+# FoodFlow 标准版 - 集群部署 Systemd 服务配置
+# 部署位置：/etc/systemd/system/foodflow.service
+# ============================================================
+
+[Unit]
+Description=FoodFlow Standard - Cluster Node
+After=network.target nfs-client.target
+Wants=network.target nfs-client.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+
+WorkingDirectory=/var/www/foodflow
+EnvironmentFile=/etc/foodflow/.env
+
+ExecStart=/usr/bin/node server.js
+
+Restart=always
+RestartSec=5
+
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=7G
+MemoryHigh=6G
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/foodflow/logs /mnt/shared/uploads
+ReadOnlyPaths=/var/www/foodflow
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=foodflow
+
+[Install]
+WantedBy=multi-user.target

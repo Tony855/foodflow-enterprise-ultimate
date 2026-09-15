@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>{{table}} · {{storeName}} {{qrCode}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a1a2e;
+    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: clamp(8px, 2vw, 24px);
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: absolute;
+    width: clamp(250px, 50vw, 500px);
+    height: clamp(250px, 50vw, 500px);
+    background: radial-gradient(circle, rgba(232,93,58,0.15) 0%, transparent 70%);
+    top: -10%; right: -10%;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: absolute;
+    width: clamp(200px, 40vw, 400px);
+    height: clamp(200px, 40vw, 400px);
+    background: radial-gradient(circle, rgba(241,196,15,0.1) 0%, transparent 70%);
+    bottom: -8%; left: -8%;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .qr-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: clamp(16px, 2.5vw, 28px);
+    padding: 0;
+    box-shadow: 0 clamp(15px, 3vw, 30px) clamp(40px, 8vw, 80px) rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+    text-align: center;
+    width: min(100%, clamp(280px, 38vw, 420px));
+    max-height: 95vh;
+    max-height: 95dvh;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    animation: cardEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex;
+    flex-direction: column;
+  }
+  @keyframes cardEnter {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .card-header {
+    background: linear-gradient(135deg, #e85d3a 0%, #c0392b 100%);
+    padding: clamp(16px, 2.5vw, 36px) clamp(16px, 2.5vw, 32px) clamp(14px, 2vw, 32px);
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .card-header::before {
+    content: '';
+    position: absolute;
+    top: -50%; right: -20%;
+    width: clamp(100px, 20vw, 200px);
+    height: clamp(100px, 20vw, 200px);
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+  }
+  .card-header::after {
+    content: '';
+    position: absolute;
+    bottom: -60%; left: -10%;
+    width: clamp(80px, 15vw, 150px);
+    height: clamp(80px, 15vw, 150px);
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+  }
+  .brand-icon {
+    font-size: clamp(28px, 4vw, 52px);
+    margin-bottom: clamp(4px, 0.8vw, 8px);
+    position: relative;
+    z-index: 1;
+    line-height: 1;
+  }
+  .brand-name {
+    font-size: clamp(20px, 3vw, 42px);
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: clamp(1px, 0.2vw, 2px);
+    position: relative;
+    z-index: 1;
+    margin-top: clamp(4px, 0.8vw, 6px);
+    word-break: break-word;
+    line-height: 1.2;
+  }
+  .card-body {
+    padding: clamp(16px, 2.5vw, 36px) clamp(16px, 2.5vw, 32px) clamp(14px, 2vw, 32px);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .table-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: clamp(6px, 1vw, 8px);
+    background: linear-gradient(135deg, #fff5f0 0%, #ffe8dc 100%);
+    border: 2px solid #ffd4c2;
+    color: #e85d3a;
+    font-size: clamp(13px, 1.8vw, 22px);
+    font-weight: 800;
+    padding: clamp(6px, 1.2vw, 14px) clamp(16px, 3vw, 36px);
+    border-radius: 50px;
+    margin-bottom: clamp(12px, 2vw, 26px);
+    box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(8px, 1.5vw, 15px) rgba(232,93,58,0.15);
+    flex-shrink: 0;
+  }
+  .table-badge .dot {
+    width: clamp(6px, 1vw, 8px);
+    height: clamp(6px, 1vw, 8px);
+    background: #e85d3a;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+  .qr-container {
+    position: relative;
+    display: inline-block;
+    margin-bottom: clamp(14px, 2.5vw, 36px);
+    flex-shrink: 0;
+  }
+  .qr-frame {
+    background: #fff;
+    border: clamp(2px, 0.3vw, 3px) solid #f0f0f0;
+    border-radius: clamp(12px, 2vw, 22px);
+    padding: clamp(10px, 1.8vw, 22px);
+    box-shadow: 0 clamp(4px, 1vw, 8px) clamp(15px, 3vw, 30px) rgba(0,0,0,0.08), inset 0 1px 5px rgba(0,0,0,0.02);
+    position: relative;
+  }
+  .qr-frame::before, .qr-frame::after {
+    content: '';
+    position: absolute;
+    width: clamp(16px, 2.5vw, 24px);
+    height: clamp(16px, 2.5vw, 24px);
+    border: clamp(2px, 0.3vw, 3px) solid #e85d3a;
+  }
+  .qr-frame::before {
+    top: -2px; left: -2px;
+    border-right: none; border-bottom: none;
+    border-radius: clamp(6px, 1vw, 8px) 0 0 0;
+  }
+  .qr-frame::after {
+    bottom: -2px; right: -2px;
+    border-left: none; border-top: none;
+    border-radius: 0 0 clamp(6px, 1vw, 8px) 0;
+  }
+  .qr-frame img {
+    display: block;
+    width: clamp(140px, 28vw, 300px);
+    height: clamp(140px, 28vw, 300px);
+    max-width: 100%;
+    border-radius: clamp(6px, 1vw, 8px);
+    image-rendering: -webkit-optimize-contrast;
+  }
+  .scan-text {
+    font-size: clamp(15px, 2.2vw, 26px);
+    font-weight: 700;
+    color: #2c3e50;
+    margin-top: clamp(8px, 1.5vw, 18px);
+    margin-bottom: clamp(10px, 1.8vw, 24px);
+    letter-spacing: clamp(0.5px, 0.1vw, 1px);
+    flex-shrink: 0;
+    line-height: 1.5;
+  }
+  .scan-line {
+    font-size: clamp(14px, 2vw, 22px);
+    font-weight: 700;
+    color: #2c3e50;
+    line-height: 1.6;
+    letter-spacing: clamp(0.5px, 0.1vw, 1px);
+  }
+  .scan-line:not(:last-child) {
+    margin-bottom: clamp(2px, 0.4vw, 6px);
+  }
+  .url-box-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: clamp(12px, 2vw, 20px);
+    width: 100%;
+    flex-shrink: 0;
+  }
+  .url-input {
+    flex: 1;
+    min-width: 0;
+    background: #f8f9fa;
+    border: 1px solid #eee;
+    border-radius: clamp(8px, 1.2vw, 10px);
+    padding: clamp(8px, 1.2vw, 12px) clamp(10px, 1.5vw, 14px);
+    font-size: clamp(10px, 1.3vw, 13px);
+    color: #2c3e50;
+    font-family: monospace;
+    outline: none;
+    cursor: text;
+  }
+  .url-input:focus {
+    border-color: #e85d3a;
+    box-shadow: 0 0 0 3px rgba(232,93,58,0.1);
+  }
+  .copy-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #e85d3a 0%, #c0392b 100%);
+    color: #fff;
+    border: none;
+    border-radius: clamp(8px, 1.2vw, 10px);
+    padding: clamp(8px, 1.2vw, 12px) clamp(14px, 2vw, 20px);
+    font-size: clamp(11px, 1.4vw, 14px);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .copy-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232,93,58,0.3);
+  }
+  .copy-btn:active {
+    transform: translateY(0);
+  }
+  .copy-btn.copied {
+    background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%);
+  }
+  .url-box {
+    background: #f8f9fa;
+    border: 1px solid #eee;
+    border-radius: clamp(8px, 1.2vw, 10px);
+    padding: clamp(6px, 1vw, 10px) clamp(10px, 1.5vw, 14px);
+    font-size: clamp(8px, 1.1vw, 11px);
+    color: #95a5a6;
+    word-break: break-all;
+    margin-bottom: clamp(12px, 2vw, 20px);
+    font-family: monospace;
+    width: 100%;
+    flex-shrink: 0;
+  }
+  .actions {
+    display: flex;
+    gap: clamp(8px, 1.2vw, 10px);
+    width: 100%;
+    flex-shrink: 0;
+  }
+  .btn {
+    flex: 1;
+    padding: clamp(10px, 1.5vw, 18px) clamp(8px, 1.2vw, 16px);
+    border: none;
+    border-radius: clamp(10px, 1.5vw, 16px);
+    font-size: clamp(11px, 1.4vw, 16px);
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(4px, 0.8vw, 6px);
+    white-space: nowrap;
+  }
+  .btn-download {
+    background: linear-gradient(135deg, #e85d3a 0%, #c0392b 100%);
+    color: #fff;
+    box-shadow: 0 clamp(3px, 0.6vw, 6px) clamp(10px, 2vw, 20px) rgba(232,93,58,0.35);
+  }
+  .btn-download:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 clamp(5px, 1vw, 10px) clamp(15px, 3vw, 30px) rgba(232,93,58,0.45);
+  }
+  .btn-download:active { transform: translateY(-1px); }
+  .btn-print {
+    background: #fff;
+    color: #7f8c8d;
+    border: 2px solid #ecf0f1;
+  }
+  .btn-print:hover {
+    border-color: #bdc3c7;
+    background: #f8f9fa;
+  }
+  .card-footer {
+    background: #fafafa;
+    padding: clamp(10px, 1.5vw, 16px);
+    border-top: 1px solid #f0f0f0;
+    font-size: clamp(8px, 1vw, 11px);
+    color: #bdc3c7;
+    letter-spacing: clamp(0.5px, 0.1vw, 1px);
+    flex-shrink: 0;
+  }
+  /* 超小屏优化 */
+  @media (max-width: 360px) {
+    .actions { flex-direction: column; gap: 8px; }
+    .btn { padding: 10px; font-size: 12px; }
+  }
+  /* 横屏低高度优化 */
+  @media (max-height: 600px) and (orientation: landscape) {
+    body { padding: 8px; align-items: flex-start; overflow-y: auto; }
+    .qr-card { max-height: none; }
+    .card-header { padding: 14px 20px 12px; }
+    .brand-icon { font-size: 28px; margin-bottom: 2px; }
+    .brand-name { font-size: 22px; }
+    .card-body { padding: 14px 20px 12px; }
+    .table-badge { font-size: 13px; padding: 6px 18px; margin-bottom: 10px; }
+    .qr-frame { padding: 10px; }
+    .qr-frame img { width: 130px; height: 130px; }
+    .qr-container { margin-bottom: 10px; }
+    .scan-text { font-size: 14px; margin-top: 6px; margin-bottom: 8px; }
+    .scan-line { font-size: 13px; line-height: 1.5; }
+    .url-box { display: none; }
+    .btn { padding: 8px 10px; font-size: 11px; }
+  }
+  /* 打印样式 - 自动缩放适应纸张 */
+  @page {
+    size: auto;
+    margin: 8mm;
+  }
+  @media print {
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      background: #fff !important;
+      padding: 0 !important;
+      min-height: auto;
+      overflow: visible;
+    }
+    body::before, body::after { display: none !important; }
+    .qr-card {
+      box-shadow: none !important;
+      border: 2px solid #eee;
+      width: 100% !important;
+      max-width: 80mm !important;
+      max-height: none !important;
+      animation: none !important;
+      page-break-inside: avoid;
+    }
+    .card-header { padding: 16px 16px 14px !important; }
+    .brand-icon { font-size: 32px !important; }
+    .brand-name { font-size: 24px !important; }
+    .card-body { padding: 16px !important; overflow: visible !important; }
+    .table-badge { font-size: 14px !important; padding: 6px 20px !important; margin-bottom: 14px !important; }
+    .qr-frame { padding: 12px !important; }
+    .qr-frame img { width: 180px !important; height: 180px !important; }
+    .qr-container { margin-bottom: 14px !important; }
+    .scan-text { font-size: 16px !important; margin-top: 8px !important; margin-bottom: 12px !important; }
+    .scan-line { font-size: 15px !important; line-height: 1.6 !important; }
+    .url-box { display: none !important; }
+    .actions, .card-footer { display: none !important; }
+  }
+</style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="qr-card">
+    <div class="card-header">
+      <div class="brand-icon">🍽️</div>
+      <div class="brand-name">{{storeName}}</div>
+    </div>
+    <div class="card-body">
+      <div class="table-badge">
+        <span class="dot"></span>
+        {{tableLabel}} {{table}}
+      </div>
+      <div class="qr-container">
+        <div class="qr-frame">
+          <img src="{{qrDataUrl}}" alt="{{orderingQrCode}}">
+        </div>
+      </div>
+      <div class="scan-text">{{scanToOrderLines}}</div>
+      <div class="url-box-wrap">
+        <input type="text" class="url-input" id="urlInput" value="{{url}}" readonly>
+        <button class="copy-btn" onclick="copyUrl()" title="{{copyLink}}">
+          <i class="fas fa-copy"></i>
+          <span class="copy-text">{{copy}}</span>
+        </button>
+      </div>
+      <div class="actions">
+        <button class="btn btn-download" onclick="downloadQR()">
+          <span>📥</span> {{download}}
+        </button>
+        <button class="btn btn-print" onclick="window.print()">
+          <span>🖨️</span> {{print}}
+        </button>
+      </div>
+    </div>
+  </div>
+  <script>
+  const QR_DATA = {
+    storeName: {{storeNameJson}},
+    table: {{tableJson}},
+    tableLabel: {{tableLabelJson}},
+    scanToOrder: {{scanToOrderJson}},
+    qrCode: {{qrCodeJson}},
+    qrDataUrl: {{qrDataUrlJson}}
+  };
+  function downloadQR() {
+    // 精确绘制，与网页样式一致（白色背景，无深色背景）
+    const W = 1200, H = 1600;
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    
+    // 1. 白色背景
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    
+    // 2. 白色卡片（带浅灰边框，无阴影）
+    const cardX = 90, cardY = 90, cardW = W - 180, cardH = H - 180;
+    const cardGrad = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
+    cardGrad.addColorStop(0, '#ffffff');
+    cardGrad.addColorStop(1, '#f8f9fa');
+    ctx.fillStyle = cardGrad;
+    roundRect(ctx, cardX, cardY, cardW, cardH, 35);
+    ctx.fill();
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 2;
+    roundRect(ctx, cardX, cardY, cardW, cardH, 35);
+    ctx.stroke();
+    
+    // 3. 红色渐变头部
+    const headerH = 300;
+    const headerGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + headerH);
+    headerGrad.addColorStop(0, '#e85d3a');
+    headerGrad.addColorStop(1, '#c0392b');
+    ctx.fillStyle = headerGrad;
+    roundRect(ctx, cardX, cardY, cardW, headerH, 35, true, true, false, false);
+    ctx.fill();
+    
+    // 头部装饰圆
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    ctx.arc(cardX + cardW - 30, cardY + 30, 90, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    ctx.arc(cardX + 50, cardY + headerH - 20, 70, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 4. 品牌图标和名称
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.font = '50px sans-serif';
+    ctx.fillText('🍽️', W/2, cardY + 90);
+    ctx.font = 'bold 44px "Noto Sans SC", sans-serif';
+    const storeName = QR_DATA.storeName;
+    if (storeName.length > 10) {
+      const mid = Math.ceil(storeName.length / 2);
+      ctx.fillText(storeName.substring(0, mid), W/2, cardY + 170);
+      ctx.fillText(storeName.substring(mid), W/2, cardY + 235);
+    } else {
+      ctx.fillText(storeName, W/2, cardY + 200);
+    }
+    
+    // 5. 桌号徽章
+    const badgeY = cardY + headerH + 50;
+    const badgeText = QR_DATA.tableLabel + ' ' + QR_DATA.table;
+    ctx.font = 'bold 28px "Noto Sans SC", sans-serif';
+    const badgeWidth = ctx.measureText(badgeText).width + 80;
+    const badgeX = W/2 - badgeWidth/2;
+    const badgeH = 60;
+    const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
+    badgeGrad.addColorStop(0, '#fff5f0');
+    badgeGrad.addColorStop(1, '#ffe8dc');
+    ctx.fillStyle = badgeGrad;
+    roundRect(ctx, badgeX, badgeY, badgeWidth, badgeH, 30);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd4c2';
+    ctx.lineWidth = 3;
+    roundRect(ctx, badgeX, badgeY, badgeWidth, badgeH, 30);
+    ctx.stroke();
+    // 徽章圆点
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath();
+    ctx.arc(badgeX + 30, badgeY + badgeH/2, 9, 0, Math.PI * 2);
+    ctx.fill();
+    // 徽章文字
+    ctx.fillStyle = '#c0392b';
+    ctx.font = 'bold 28px "Noto Sans SC", sans-serif';
+    ctx.fillText(badgeText, W/2 + 15, badgeY + badgeH/2);
+    
+    // 6. 二维码框
+    const qrSize = 540;
+    const qrX = W/2 - qrSize/2;
+    const qrY = badgeY + badgeH + 50;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 4;
+    roundRect(ctx, qrX - 20, qrY - 20, qrSize + 40, qrSize + 40, 22);
+    ctx.fill();
+    ctx.stroke();
+    // 四角红色装饰
+    ctx.strokeStyle = '#e85d3a';
+    ctx.lineWidth = 6;
+    const cs = 35;
+    // 左上角
+    ctx.beginPath();
+    ctx.moveTo(qrX - 20, qrY - 20 + cs);
+    ctx.lineTo(qrX - 20, qrY - 20);
+    ctx.lineTo(qrX - 20 + cs, qrY - 20);
+    ctx.stroke();
+    // 右下角
+    ctx.beginPath();
+    ctx.moveTo(qrX + qrSize + 20 - cs, qrY + qrSize + 20);
+    ctx.lineTo(qrX + qrSize + 20, qrY + qrSize + 20);
+    ctx.lineTo(qrX + qrSize + 20, qrY + qrSize + 20 - cs);
+    ctx.stroke();
+    
+    // 绘制二维码
+    const qrImg = new Image();
+    qrImg.crossOrigin = 'anonymous';
+    qrImg.onload = function() {
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+      // 7. 扫码点餐文字（多语言）
+      const lines = Array.isArray(QR_DATA.scanToOrder) ? QR_DATA.scanToOrder : [QR_DATA.scanToOrder];
+      ctx.fillStyle = '#2c3e50';
+      ctx.font = 'bold 36px "Noto Sans SC", sans-serif';
+      const textStartY = qrY + qrSize + 70;
+      lines.forEach((line, i) => {
+        ctx.fillText(line, W/2, textStartY + i * 55);
+      });
+      // 下载
+      const link = document.createElement('a');
+      link.download = QR_DATA.storeName + '-' + QR_DATA.table + '-' + QR_DATA.qrCode + '.png';
+      link.href = canvas.toDataURL('image/png', 1.0);
+      link.click();
+    };
+    qrImg.src = QR_DATA.qrDataUrl;
+  }
+  
+  function roundRect(ctx, x, y, w, h, r, topLeft=true, topRight=true, bottomRight=true, bottomLeft=true) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    if (topRight) ctx.lineTo(x + w - r, y);
+    else ctx.lineTo(x + w, y);
+    if (topRight) ctx.arcTo(x + w, y, x + w, y + r, r);
+    if (bottomRight) ctx.lineTo(x + w, y + h - r);
+    else ctx.lineTo(x + w, y + h);
+    if (bottomRight) ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    if (bottomLeft) ctx.lineTo(x + r, y + h);
+    else ctx.lineTo(x, y + h);
+    if (bottomLeft) ctx.arcTo(x, y + h, x, y + h - r, r);
+    if (topLeft) ctx.lineTo(x, y + r);
+    else ctx.lineTo(x, y);
+    if (topLeft) ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+  function copyUrl() {
+    const input = document.getElementById('urlInput');
+    const btn = document.querySelector('.copy-btn');
+    if (!input || !btn) return;
+    input.select();
+    input.setSelectionRange(0, 99999);
+    let success = false;
+    try {
+      success = document.execCommand('copy');
+    } catch(e) {
+      success = false;
+    }
+    if (!success && navigator.clipboard) {
+      navigator.clipboard.writeText(input.value).then(function() {
+        showCopiedState(btn);
+      }).catch(function() {
+        alert('{{copyFailed}}');
+      });
+    } else if (success) {
+      showCopiedState(btn);
+    } else {
+      alert('{{copyFailed}}');
+    }
+    window.getSelection().removeAllRanges();
+  }
+  function showCopiedState(btn) {
+    const originalHTML = btn.innerHTML;
+    btn.classList.add('copied');
+    btn.innerHTML = '<i class="fas fa-check"></i> <span class="copy-text">{{copied}}</span>';
+    setTimeout(function() {
+      btn.classList.remove('copied');
+      btn.innerHTML = originalHTML;
+    }, 2000);
+  }
+  </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# 依赖
+node_modules/
+
+# 环境配置（包含密码，请勿提交）
+.env
+
+# 备份文件
+backups/
+
+# 上传文件
+uploads/
+
+# 数据文件（运行时生成）
+data/orders.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+*.png
+*.jpg
+*.jpeg

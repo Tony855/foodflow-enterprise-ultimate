@@ -1,0 +1,35 @@
+# ============================================================
+# FoodFlow 点餐系统 - 单台部署 Systemd 服务配置
+# 部署位置：/etc/systemd/system/foodflow.service
+#
+# 注意：install-local.sh 会自动生成此文件，
+# 本文件仅作为参考模板
+# ============================================================
+
+[Unit]
+Description=FoodFlow QR Ordering System
+After=network.target mysql.service mariadb.service redis.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+WorkingDirectory=/var/www/foodflow
+
+# 使用 env 命令查找 node，避免路径写死
+ExecStart=/usr/bin/env node server.js
+
+Restart=always
+RestartSec=5
+
+LimitNOFILE=65536
+
+# 生产环境输出到 journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=foodflow
+
+[Install]
+WantedBy=multi-user.target
